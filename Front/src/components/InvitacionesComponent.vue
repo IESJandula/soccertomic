@@ -16,6 +16,8 @@ const uiStore = useUiStore()
 const notificationsStore = useNotificationsStore()
 
 const invitaciones = ref([])
+const invitacionesEquipo = ref([])
+const notificacionesInfo = ref([])
 const solicitudesAmistad = ref([])
 const invitacionesAceptadas = ref([])
 const invitacionesCanceladas = ref([])
@@ -37,9 +39,11 @@ const cargarTodo = async () => {
       invitacionService.obtenerMisInvitaciones(),
       amistadService.obtenerSolicitudesPendientes(),
     ])
+    invitacionesEquipo.value = await invitacionService.obtenerMisInvitacionesEquipo()
     const esReserva = (inv) => inv && (inv.precioTotalPista !== null && inv.precioTotalPista !== undefined)
     invitaciones.value = todasInvitaciones.filter(i => i.estado === 'PENDIENTE')
-    invitacionesAceptadas.value = todasInvitaciones.filter(i => i.estado === 'ACEPTADA' && !esReserva(i))
+    invitacionesAceptadas.value = todasInvitaciones.filter(i => i.estado === 'ACEPTADA' && !esReserva(i) && !i.mensaje)
+    notificacionesInfo.value = todasInvitaciones.filter(i => i.estado === 'ACEPTADA' && !esReserva(i) && Boolean(i.mensaje))
     invitacionesCanceladas.value = todasInvitaciones.filter(i => i.estado === 'CANCELADA')
     invitacionesReservadas.value = todasInvitaciones.filter(i => esReserva(i) && !Boolean(i.pagada))
     invitacionesReservadasPagadas.value = todasInvitaciones.filter(i => esReserva(i) && Boolean(i.pagada))
@@ -85,6 +89,32 @@ const aceptarInvitacion = async (invitacionId, partidoId) => {
     await cargarTodo()
   } catch (error) {
     uiStore.showToast({ message: error.message || 'Error al aceptar invitación.', type: 'error' })
+  } finally {
+    procesando.value = null
+  }
+}
+
+const aceptarInvitacionEquipo = async (invitacionId) => {
+  procesando.value = `equipo-${invitacionId}`
+  try {
+    await invitacionService.aceptarInvitacionEquipo(invitacionId)
+    uiStore.showToast({ message: 'Te uniste al equipo correctamente.', type: 'success' })
+    await cargarTodo()
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'Error al aceptar invitacion de equipo.', type: 'error' })
+  } finally {
+    procesando.value = null
+  }
+}
+
+const rechazarInvitacionEquipo = async (invitacionId) => {
+  procesando.value = `equipo-${invitacionId}`
+  try {
+    await invitacionService.rechazarInvitacionEquipo(invitacionId)
+    uiStore.showToast({ message: 'Invitacion de equipo rechazada.', type: 'info' })
+    await cargarTodo()
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'Error al rechazar invitacion de equipo.', type: 'error' })
   } finally {
     procesando.value = null
   }
@@ -295,6 +325,61 @@ const irAPartido = (partidoId) => {
         </div>
       </section>
 
+      <!-- Notificaciones informativas -->
+      <section v-if="notificacionesInfo.length > 0" class="card-surface p-4 md:p-5">
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="bell" :size="18" />Notificaciones informativas ({{ notificacionesInfo.length }})</h3>
+        <div class="space-y-3 mt-3">
+          <article v-for="inv in notificacionesInfo" :key="`info-${inv.id}`" class="border border-indigo-200 bg-indigo-50 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-800">Info de equipo</p>
+              <StatusBadge status="ACEPTADA" />
+            </div>
+            <p class="text-sm text-slate-700">{{ inv.mensaje }}</p>
+            <p class="text-xs text-slate-500">{{ formatearFecha(inv.respondidaEn || inv.creadaEn) }}</p>
+            <BaseButton block size="sm" variant="secondary" @click="irAPartido(inv.partido?.id || inv.partidoId)">
+              Ir al partido
+            </BaseButton>
+          </article>
+        </div>
+      </section>
+
+      <!-- Invitaciones a equipos pendientes -->
+      <section v-if="invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length > 0" class="card-surface p-4 md:p-5">
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Invitaciones a equipos ({{ invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length }})</h3>
+        <div class="space-y-3 mt-3">
+          <article v-for="inv in invitacionesEquipo.filter(i => i.estado === 'PENDIENTE')" :key="`equipo-${inv.id}`" class="border border-indigo-200 bg-indigo-50 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-800">Invitacion de equipo</p>
+              <StatusBadge status="PENDIENTE" />
+            </div>
+            <p class="text-sm text-slate-700">{{ inv.mensaje }}</p>
+            <p class="text-xs text-slate-600">Equipo: {{ inv.equipoRapidoNombre }}</p>
+            <p class="text-xs text-slate-600">Te invita: {{ inv.emisor?.nombre }}</p>
+            <p class="text-xs text-slate-500">{{ formatearFecha(inv.creadaEn) }}</p>
+
+            <div class="grid grid-cols-2 gap-2">
+              <BaseButton
+                block
+                size="sm"
+                :loading="procesando === `equipo-${inv.id}`"
+                @click="aceptarInvitacionEquipo(inv.id)"
+              >
+                Aceptar
+              </BaseButton>
+              <BaseButton
+                block
+                size="sm"
+                variant="danger"
+                :loading="procesando === `equipo-${inv.id}`"
+                @click="rechazarInvitacionEquipo(inv.id)"
+              >
+                Rechazar
+              </BaseButton>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <!-- Invitaciones aceptadas -->
       <section v-if="invitacionesAceptadas.length > 0" class="card-surface p-4 md:p-5">
         <button
@@ -336,7 +421,7 @@ const irAPartido = (partidoId) => {
       </section>
 
       <!-- Estado vacío -->
-      <section v-if="invitaciones.length === 0 && invitacionesAceptadas.length === 0 && invitacionesCanceladas.length === 0 && invitacionesReservadas.length === 0 && invitacionesReservadasPagadas.length === 0 && solicitudesAmistad.length === 0" class="state-empty">
+      <section v-if="invitaciones.length === 0 && invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length === 0 && notificacionesInfo.length === 0 && invitacionesAceptadas.length === 0 && invitacionesCanceladas.length === 0 && invitacionesReservadas.length === 0 && invitacionesReservadasPagadas.length === 0 && solicitudesAmistad.length === 0" class="state-empty">
         <p class="text-slate-700 font-medium">No tienes notificaciones por ahora.</p>
         <p class="text-caption mt-1">Las invitaciones y solicitudes de amistad aparecerán aquí.</p>
       </section>

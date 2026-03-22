@@ -10,10 +10,13 @@ import com.worldcup.Back.dto.response.PartidoHistorialDTO;
 import com.worldcup.Back.dto.response.PartidoOrganizadorDTO;
 import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.PartidoOrganizadorEntity;
+import com.worldcup.Back.entity.EquipoRapidoEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.EstadoPartido;
 import com.worldcup.Back.security.FirebaseRequestContext;
 import com.worldcup.Back.service.AmistadService;
+import com.worldcup.Back.service.EquipoRapidoService;
+import com.worldcup.Back.service.InvitacionService;
 import com.worldcup.Back.service.PartidoService;
 import com.worldcup.Back.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +45,12 @@ public class PartidoController {
 
     @Autowired
     private AmistadService amistadService;
+
+    @Autowired
+    private EquipoRapidoService equipoRapidoService;
+
+    @Autowired
+    private InvitacionService invitacionService;
 
     private List<PartidoOrganizadorDTO> mapOrganizadores(PartidoEntity partido) {
         List<PartidoOrganizadorEntity> relaciones = partidoService.obtenerOrganizadores(partido.getId());
@@ -138,6 +147,33 @@ public class PartidoController {
         
         PartidoEntity creado = partidoService.crearPartido(partido, creador.get());
         creado = partidoService.inscribirOwnerInicial(creado.getId(), creador.get());
+
+        if (dto.getConvocarEquipoRapidoId() != null) {
+            String equipoDestino = "B".equalsIgnoreCase(dto.getEquipoDestinoConvocado()) ? "B" : "A";
+            EquipoRapidoEntity equipoRapido = equipoRapidoService.obtenerEquipoRapidoPropio(creador.get(), dto.getConvocarEquipoRapidoId());
+
+            int integrantesConvocados = 1 + equipoRapido.getMiembros().size();
+            if (integrantesConvocados > creado.getJugadoresPorEquipo()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            creado = partidoService.asignarJugadorAEquipo(creado.getId(), creador.get().getId(), equipoDestino, creador.get());
+
+            for (UsuarioEntity miembro : equipoRapido.getMiembros()) {
+                if (miembro.getId().equals(creador.get().getId())) {
+                    continue;
+                }
+                partidoService.inscribirseAPartido(creado.getId(), miembro);
+                creado = partidoService.asignarJugadorAEquipo(creado.getId(), miembro.getId(), equipoDestino, creador.get());
+                invitacionService.crearNotificacionConvocatoriaEquipo(
+                        creado,
+                        miembro,
+                        equipoRapido.getNombre(),
+                        creador.get().getNombre(),
+                        equipoDestino
+                );
+            }
+        }
         
         return ResponseEntity.ok(entityToDTO(creado));
     }

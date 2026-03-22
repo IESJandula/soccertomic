@@ -77,6 +77,26 @@ const ageRangeLabel = computed(() => {
   return option ? option.label : '18 a 25'
 })
 
+const playStyleLabel = computed(() => {
+  if (form.value.playStyle === 'O') return 'Ofensiva'
+  if (form.value.playStyle === 'D') return 'Defensiva'
+  return 'Adaptable'
+})
+
+const categoriaAtributo = (valor) => {
+  const v = Number(valor)
+  if (!Number.isFinite(v)) return 'Nulo'
+  const labels = {
+    0: 'Nulo',
+    1: 'Muy bajo',
+    2: 'Bajo',
+    3: 'Medio',
+    4: 'Alto',
+    5: 'Muy alto',
+  }
+  return labels[Math.round(v)] || 'Nulo'
+}
+
 const stepDescription = computed(() => {
   const descs = {
     1: 'Empieza con un perfil predefinido según tu posición (puedes ajustar después)',
@@ -359,15 +379,6 @@ onMounted(() => {
                 :options="profileStore.playStyleOptions"
                 @update:model-value="form.playStyle = $event"
               />
-              <div class="space-y-1">
-                <label class="block text-sm font-semibold text-gray-700">Posición preferida</label>
-                <select v-model="form.posicionPreferida" @change="form.goalkeeper = form.posicionPreferida === 'PORTERO'" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                  <option value="DELANTERO">Delantero</option>
-                  <option value="MEDIOCAMPISTA">Mediocampista</option>
-                  <option value="DEFENSA">Defensa</option>
-                  <option value="PORTERO">Portero</option>
-                </select>
-              </div>
               <AgeRangeSelector
                 v-if="!isFutbolistaMode"
                 :model-value="form.ageRange"
@@ -402,31 +413,31 @@ onMounted(() => {
             <div class="bg-slate-50 rounded-lg p-3">
               <div class="grid grid-cols-3 gap-2 text-center text-xs">
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.shooting }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.shooting) }}</p>
                   <p class="text-slate-600">Disparo</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.speed }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.speed) }}</p>
                   <p class="text-slate-600">Velocidad</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.dribbling }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.dribbling) }}</p>
                   <p class="text-slate-600">Regate</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.defense }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.defense) }}</p>
                   <p class="text-slate-600">Defensa</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.strength }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.strength) }}</p>
                   <p class="text-slate-600">Físico</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.stamina }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.stamina) }}</p>
                   <p class="text-slate-600">Resistencia</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.aerial }}</p>
+                  <p class="font-semibold text-slate-900">{{ categoriaAtributo(form.aerial) }}</p>
                   <p class="text-slate-600">Aéreo</p>
                 </div>
                 <div class="bg-white rounded p-2">
@@ -434,7 +445,7 @@ onMounted(() => {
                   <p class="text-slate-600">Posición preferida</p>
                 </div>
                 <div class="bg-white rounded p-2">
-                  <p class="font-semibold text-slate-900">{{ form.playStyle }}</p>
+                  <p class="font-semibold text-slate-900">{{ playStyleLabel }}</p>
                   <p class="text-slate-600">Estilo</p>
                 </div>
               </div>

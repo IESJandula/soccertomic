@@ -19,4 +19,6 @@ public class PartidoRequestDTO {
     private String tipo; // PRIVADO o PUBLICO
     private String colorEquipoA; // Color del equipo A
     private String colorEquipoB; // Color del equipo B
+    private Long convocarEquipoRapidoId; // Equipo rapido a convocar opcionalmente
+    private String equipoDestinoConvocado; // A o B
 }

@@ -255,12 +255,16 @@ const posicionPreferidaLabel = computed(() => {
 
 const categoriaAtributo = (valor) => {
   const v = Number(valor)
-  if (!Number.isFinite(v)) return 'Sin dato'
-  if (v <= 1) return 'Inicial'
-  if (v <= 2) return 'Intermedio'
-  if (v <= 3) return 'Competente'
-  if (v <= 4) return 'Fuerte'
-  return 'Destacado'
+  if (!Number.isFinite(v)) return 'Nulo'
+  const labels = {
+    0: 'Nulo',
+    1: 'Muy bajo',
+    2: 'Bajo',
+    3: 'Medio',
+    4: 'Alto',
+    5: 'Muy alto',
+  }
+  return labels[Math.round(v)] || 'Nulo'
 }
 
 const formatearFecha = (fecha) => {

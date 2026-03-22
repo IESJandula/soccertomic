@@ -52,6 +52,37 @@ class InvitacionService {
       useCache: false,
     })
   }
+
+  async invitarAEquipo(equipoRapidoId, usuarioId) {
+    const url = `${ENDPOINTS.EQUIPO_INVITACIONES}?equipoRapidoId=${equipoRapidoId}&usuarioId=${usuarioId}`
+    return apiService.request(url, {
+      method: 'POST',
+      useCache: false,
+    })
+  }
+
+  async obtenerMisInvitacionesEquipo() {
+    return apiService.request(ENDPOINTS.EQUIPO_INVITACIONES_MIS, {
+      method: 'GET',
+      useCache: false,
+    })
+  }
+
+  async aceptarInvitacionEquipo(invitacionId) {
+    const url = `${ENDPOINTS.EQUIPO_INVITACIONES}/${invitacionId}/aceptar`
+    return apiService.request(url, {
+      method: 'PUT',
+      useCache: false,
+    })
+  }
+
+  async rechazarInvitacionEquipo(invitacionId) {
+    const url = `${ENDPOINTS.EQUIPO_INVITACIONES}/${invitacionId}/rechazar`
+    return apiService.request(url, {
+      method: 'PUT',
+      useCache: false,
+    })
+  }
 }
 
 export default new InvitacionService()
