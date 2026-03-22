@@ -128,6 +128,19 @@ public class PartidoEntity {
         if (organizadores == null) {
             organizadores = new ArrayList<>();
         }
+        normalizeEstado();
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeBeforeSave() {
+        normalizeEstado();
+    }
+
+    private void normalizeEstado() {
+        if (estado != null) {
+            estado = estado.canonical();
+        }
     }
 
     // Métodos de utilidad

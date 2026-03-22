@@ -51,7 +51,7 @@ public class PartidoVotacionService {
 
     @Transactional(readOnly = true)
     public UsuarioVotacionResumenDTO obtenerResumenVotacionDeUsuario(UsuarioEntity usuario) {
-        List<PartidoEntity> historial = partidoRepository.findHistorialFinalizadoDeUsuario(usuario, EstadoPartido.FINALIZADO);
+        List<PartidoEntity> historial = partidoRepository.findHistorialFinalizadoDeUsuario(usuario, EstadoPartido.estadosFinalizadosCompatibles());
         if (historial.isEmpty()) {
             return new UsuarioVotacionResumenDTO(0, 0, 0);
         }
@@ -439,7 +439,9 @@ public class PartidoVotacionService {
             return partido;
         }
 
-        if (partido.getEstado() == EstadoPartido.FINALIZADO || partido.getEstado() == EstadoPartido.CANCELADO) {
+        EstadoPartido estadoActual = partido.getEstado() == null ? null : partido.getEstado().canonical();
+
+        if (estadoActual == null || estadoActual.isFinalizado() || estadoActual == EstadoPartido.CANCELADO) {
             return partido;
         }
 
@@ -455,7 +457,7 @@ public class PartidoVotacionService {
             return partidoRepository.save(partido);
         }
 
-        if (!ahora.isBefore(partido.getFecha()) && partido.getEstado() != EstadoPartido.EN_CURSO && partido.getEstado() != EstadoPartido.EN_JUEGO) {
+        if (!ahora.isBefore(partido.getFecha()) && estadoActual != EstadoPartido.EN_CURSO) {
             partido.setEstado(EstadoPartido.EN_CURSO);
             partido.setActualizadoEn(LocalDateTime.now());
             return partidoRepository.save(partido);

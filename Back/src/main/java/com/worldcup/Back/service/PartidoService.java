@@ -293,7 +293,7 @@ public class PartidoService {
         List<PartidoEntity> partidosCreados = partidoRepository.findByOrganizador(usuario);
         partidosCreados.forEach(this::autoFinalizarSiCorresponde);
 
-        return partidoRepository.findHistorialFinalizadoDeUsuario(usuario, EstadoPartido.FINALIZADO)
+        return partidoRepository.findHistorialFinalizadoDeUsuario(usuario, EstadoPartido.estadosFinalizadosCompatibles())
                 .stream()
                 .map(partido -> toHistorialDTO(partido, usuario))
                 .toList();
@@ -1003,7 +1003,9 @@ public class PartidoService {
             return partido;
         }
 
-        if (partido.getEstado() == EstadoPartido.FINALIZADO || partido.getEstado() == EstadoPartido.CANCELADO) {
+        EstadoPartido estadoActual = partido.getEstado() == null ? null : partido.getEstado().canonical();
+
+        if (estadoActual == null || estadoActual.isFinalizado() || estadoActual == EstadoPartido.CANCELADO) {
             return partido;
         }
 
@@ -1019,7 +1021,7 @@ public class PartidoService {
             return partidoRepository.save(partido);
         }
 
-        if (!ahora.isBefore(partido.getFecha()) && partido.getEstado() != EstadoPartido.EN_CURSO && partido.getEstado() != EstadoPartido.EN_JUEGO) {
+        if (!ahora.isBefore(partido.getFecha()) && estadoActual != EstadoPartido.EN_CURSO) {
             partido.setEstado(EstadoPartido.EN_CURSO);
             partido.setActualizadoEn(LocalDateTime.now());
             return partidoRepository.save(partido);

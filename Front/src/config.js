@@ -37,6 +37,8 @@ export const ENDPOINTS = {
   INVITACIONES: `${CORE_API_BASE_URL}/api/invitaciones`,
   INVITACIONES_MIS: `${CORE_API_BASE_URL}/api/invitaciones/mis-invitaciones`,
   INVITACIONES_PENDIENTES: `${CORE_API_BASE_URL}/api/invitaciones/pendientes`,
+  EQUIPO_INVITACIONES: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones`,
+  EQUIPO_INVITACIONES_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones/mis-invitaciones`,
 
   // ============ AMISTADES ============
   AMISTADES: `${CORE_API_BASE_URL}/api/amistades`,

@@ -42,10 +42,10 @@ public interface PartidoRepository extends JpaRepository<PartidoEntity, Long> {
                         LEFT JOIN p.organizadores org
                         LEFT JOIN p.equipoA ea
                         LEFT JOIN p.equipoB eb
-                        WHERE p.estado = :estado
+                        WHERE p.estado IN :estados
                             AND (org.usuario = :usuario OR ea = :usuario OR eb = :usuario)
                         ORDER BY p.fecha DESC
                         """)
         List<PartidoEntity> findHistorialFinalizadoDeUsuario(@Param("usuario") UsuarioEntity usuario,
-                                                                                                                 @Param("estado") EstadoPartido estado);
+                                                                                                                 @Param("estados") List<EstadoPartido> estados);
 }
