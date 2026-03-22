@@ -4,7 +4,13 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### STS ###
+### Variables de Entorno (carpeta externa) ###
+../variables-entorno/
+*.env
+.env.*
+firebase-service-account.json
+
+### IDE - Spring Tool Suite ###
 .apt_generated
 .classpath
 .factorypath
@@ -13,13 +19,14 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
+### IDE - IntelliJ IDEA ###
+.idea/
 *.iws
 *.iml
 *.ipr
+*.iml.ipr
 
-### NetBeans ###
+### IDE - NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
@@ -29,5 +36,19 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
+### IDE - VS Code ###
 .vscode/
+*.code-workspace
+
+### OS ###
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+### Editors ###
+*.swp
+*.swo
+*~
+.vim/
