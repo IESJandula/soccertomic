@@ -188,7 +188,7 @@ const irAPartido = (partidoId) => {
       <!-- Solicitudes de amistad pendientes -->
       <section v-if="solicitudesAmistad.length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Solicitudes de amistad ({{ solicitudesAmistad.length }})</h3>
-        <div class="space-y-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="solicitud in solicitudesAmistad" :key="solicitud.id" class="border border-slate-200 bg-slate-50 rounded-xl p-3 space-y-2">
             <div class="flex items-start justify-between gap-2">
               <div>
@@ -223,12 +223,12 @@ const irAPartido = (partidoId) => {
 
       <!-- Pistas reservadas -->
       <section v-if="invitacionesReservadas.length > 0" class="card-surface p-4 md:p-5">
-        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="check" :size="18" />Pistas reservadas ({{ invitacionesReservadas.length }})</h3>
-        <div class="space-y-3 mt-3">
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="bookmark" :size="18" />Pistas reservadas ({{ invitacionesReservadas.length }})</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitacionesReservadas" :key="inv.id" class="border border-blue-200 bg-blue-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Partido reservado</p>
-              <StatusBadge status="RESERVADA" />
+              <StatusBadge status="RESERVADA" :paid="Boolean(inv.pagada)" />
             </div>
             <p class="text-sm text-slate-700">{{ inv.mensaje || 'La pista de este partido ya está reservada.' }}</p>
             <p v-if="inv.parteIndividual !== null && inv.parteIndividual !== undefined" class="text-sm text-slate-700 font-semibold">
@@ -263,28 +263,33 @@ const irAPartido = (partidoId) => {
           class="w-full flex items-center justify-between gap-3"
           @click="mostrarReservasPagadas = !mostrarReservasPagadas"
         >
-          <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="check" :size="18" />Reservas pagadas ({{ invitacionesReservadasPagadas.length }})</h3>
+          <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="bookmark" :size="18" />Reservas pagadas ({{ invitacionesReservadasPagadas.length }})</h3>
           <span class="text-sm font-semibold text-slate-600">{{ mostrarReservasPagadas ? 'Ocultar' : 'Mostrar' }}</span>
         </button>
 
-        <div v-if="mostrarReservasPagadas" class="space-y-3 mt-3">
-          <article v-for="inv in invitacionesReservadasPagadas" :key="`pagada-${inv.id}`" class="border border-emerald-200 bg-emerald-50 rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-slate-800">Pago confirmado</p>
-              <StatusBadge status="ACEPTADA" />
+        <div v-if="mostrarReservasPagadas" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
+          <article v-for="inv in invitacionesReservadasPagadas" :key="`pagada-${inv.id}`" class="border border-emerald-200 bg-emerald-50 rounded-xl p-3 space-y-2 relative overflow-hidden">
+            <div aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0.28;z-index:0;">
+              <svg viewBox="0 0 24 24" width="100%" height="100%" style="max-width:260px;max-height:260px;overflow:visible;">
+                <path d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5V20l-6.5-3.8L5.5 20V6A1.5 1.5 0 0 1 7 4.5z" fill="none" stroke="rgba(37,99,235,0.92)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
             </div>
-            <p class="text-sm text-slate-700">{{ inv.mensaje || 'Reserva de pista pagada.' }}</p>
-            <p v-if="inv.parteIndividual !== null && inv.parteIndividual !== undefined" class="text-sm text-slate-700 font-semibold">
+            <div class="flex items-center justify-between gap-2 relative" style="z-index:1;">
+              <p class="text-sm font-semibold text-slate-800">Pago confirmado</p>
+              <StatusBadge status="RESERVADA" />
+            </div>
+            <p class="text-sm text-slate-700 relative" style="z-index:1;">{{ inv.mensaje || 'Reserva de pista pagada.' }}</p>
+            <p v-if="inv.parteIndividual !== null && inv.parteIndividual !== undefined" class="text-sm text-slate-700 font-semibold relative" style="z-index:1;">
               Tu parte: {{ formatearMoneda(inv.parteIndividual) }}
             </p>
-            <p v-if="inv.precioTotalPista !== null && inv.precioTotalPista !== undefined" class="text-xs text-slate-600">
+            <p v-if="inv.precioTotalPista !== null && inv.precioTotalPista !== undefined" class="text-xs text-slate-600 relative" style="z-index:1;">
               Total pista: {{ formatearMoneda(inv.precioTotalPista) }}
             </p>
-            <p class="text-xs text-slate-700 font-medium">
+            <p class="text-xs text-slate-700 font-medium relative" style="z-index:1;">
               Pagar a: {{ inv.reservadoPorNombre || 'Organización' }}
             </p>
-            <p class="text-xs text-slate-500">{{ formatearFecha(inv.respondidaEn || inv.creadaEn) }}</p>
-            <BaseButton block size="sm" variant="secondary" @click="irAPartido(inv.partido?.id || inv.partidoId)">
+            <p class="text-xs text-slate-500 relative" style="z-index:1;">{{ formatearFecha(inv.respondidaEn || inv.creadaEn) }}</p>
+            <BaseButton block size="sm" variant="secondary" class="relative" style="z-index:1;" @click="irAPartido(inv.partido?.id || inv.partidoId)">
               Ir al partido
             </BaseButton>
           </article>
@@ -294,7 +299,7 @@ const irAPartido = (partidoId) => {
       <!-- Invitaciones a partidos pendientes -->
       <section v-if="invitaciones.length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="soccer" :size="18" />Invitaciones a partidos ({{ invitaciones.length }})</h3>
-        <div class="space-y-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitaciones" :key="inv.id" class="border border-amber-200 bg-amber-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Pendiente</p>
@@ -328,7 +333,7 @@ const irAPartido = (partidoId) => {
       <!-- Notificaciones informativas -->
       <section v-if="notificacionesInfo.length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="bell" :size="18" />Notificaciones informativas ({{ notificacionesInfo.length }})</h3>
-        <div class="space-y-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in notificacionesInfo" :key="`info-${inv.id}`" class="border border-indigo-200 bg-indigo-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Info de equipo</p>
@@ -346,7 +351,7 @@ const irAPartido = (partidoId) => {
       <!-- Invitaciones a equipos pendientes -->
       <section v-if="invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Invitaciones a equipos ({{ invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length }})</h3>
-        <div class="space-y-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitacionesEquipo.filter(i => i.estado === 'PENDIENTE')" :key="`equipo-${inv.id}`" class="border border-indigo-200 bg-indigo-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Invitacion de equipo</p>
@@ -391,7 +396,7 @@ const irAPartido = (partidoId) => {
           <span class="text-sm font-semibold text-slate-600">{{ mostrarInvitacionesAceptadas ? 'Ocultar' : 'Mostrar' }}</span>
         </button>
 
-        <div v-if="mostrarInvitacionesAceptadas" class="space-y-3 mt-3">
+        <div v-if="mostrarInvitacionesAceptadas" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitacionesAceptadas" :key="inv.id" class="border border-emerald-200 bg-emerald-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Invitación aceptada</p>
@@ -408,7 +413,7 @@ const irAPartido = (partidoId) => {
       <!-- Partidos cancelados -->
       <section v-if="invitacionesCanceladas.length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="warning" :size="18" />Partidos cancelados ({{ invitacionesCanceladas.length }})</h3>
-        <div class="space-y-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitacionesCanceladas" :key="inv.id" class="border border-slate-200 bg-slate-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-slate-800">Partido cancelado</p>

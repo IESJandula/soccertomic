@@ -28,22 +28,22 @@ const presetOrder = ['STRIKER', 'MIDFIELDER', 'DEFENDER', 'GOALKEEPER']
         :class="[
           'relative px-3 py-2.5 rounded-lg border-2 transition-all text-left',
           selected === key
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-slate-200 bg-white hover:border-slate-300',
+            ? 'border-[color:var(--color-secondary)] bg-[color:rgba(151,240,125,0.12)]'
+            : 'border-[color:rgba(151,240,125,0.2)] bg-[color:var(--color-bg-elevated)] hover:border-[color:rgba(151,240,125,0.34)]',
         ]"
       >
         <div class="flex items-start justify-between">
           <div class="flex-1">
-            <p class="text-sm font-bold text-slate-900">
+            <p class="text-sm font-bold text-slate-100">
               {{ presets[key].name }}
             </p>
-            <p class="text-xs text-slate-600 mt-0.5">{{ presets[key].description }}</p>
+            <p class="text-xs text-slate-300 mt-0.5">{{ presets[key].description }}</p>
           </div>
           <div
             v-if="selected === key"
-            class="ml-2 flex-shrink-0 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center"
+            class="ml-2 flex-shrink-0 w-5 h-5 rounded-full theme-primary-surface flex items-center justify-center"
           >
-            <AppIcon name="check" :size="12" class="text-white" />
+            <AppIcon name="check" :size="12" class="text-[color:var(--color-on-accent)]" />
           </div>
         </div>
       </button>

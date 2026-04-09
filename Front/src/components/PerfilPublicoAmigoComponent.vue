@@ -13,6 +13,9 @@ const error = ref('')
 const perfil = ref(null)
 const usuario = ref(null)
 const historialPartidos = ref([])
+const mesesHistorialVisibles = ref(2)
+const diaSeleccionadoKey = ref('')
+const mostrandoDetalleDia = ref(false)
 const resumenVotacion = ref({
   vecesDiferencial: 0,
   valoracionesPositivas: 0,
@@ -76,6 +79,147 @@ const partidosJugados = computed(() => {
   return historialPartidos.value.filter((p) => ['VICTORIA', 'DERROTA', 'EMPATE'].includes(p.resultadoParaUsuario)).length
 })
 
+const diasSemana = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+const hoyKey = new Date().toISOString().slice(0, 10)
+
+const etiquetaMes = (year, monthIndex) => {
+  return new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
+    .format(new Date(year, monthIndex, 1))
+}
+
+const prioridadResultado = (resultado) => {
+  if (resultado === 'DERROTA') return 3
+  if (resultado === 'EMPATE') return 2
+  if (resultado === 'VICTORIA') return 1
+  return 0
+}
+
+const resultadoDia = (partidos = []) => {
+  if (!partidos.length) return 'SIN_DATOS'
+  return partidos.reduce((acc, p) => (prioridadResultado(p.resultadoParaUsuario) > prioridadResultado(acc) ? p.resultadoParaUsuario : acc), 'SIN_DATOS')
+}
+
+const claseDiaCalendario = (partidos = [], dayKey = '') => {
+  const isToday = dayKey === hoyKey
+  const hasMatch = partidos.length > 0
+  if (isToday && hasMatch) return 'calendar-day-today-with-match'
+  if (isToday) return 'calendar-day-today'
+  if (hasMatch) return 'calendar-day-with-match'
+  return 'calendar-day-empty'
+}
+
+const historialPorMes = computed(() => {
+  const partidosPorDia = new Map()
+
+  for (const partido of historialPartidos.value) {
+    const fecha = new Date(partido?.fecha)
+    if (!Number.isFinite(fecha.getTime())) continue
+    const dayKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`
+    if (!partidosPorDia.has(dayKey)) partidosPorDia.set(dayKey, [])
+    partidosPorDia.get(dayKey).push(partido)
+  }
+
+  const monthKeys = [...new Set([...partidosPorDia.keys()].map((k) => k.slice(0, 7)))]
+    .sort((a, b) => (a < b ? 1 : -1))
+
+  return monthKeys.map((monthKey) => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr) - 1
+    const firstDay = new Date(year, month, 1)
+    const totalDays = new Date(year, month + 1, 0).getDate()
+    const startOffset = (firstDay.getDay() + 6) % 7
+    const cells = []
+
+    for (let i = 0; i < startOffset; i += 1) {
+      cells.push({ key: `${monthKey}-empty-start-${i}`, empty: true })
+    }
+
+    for (let day = 1; day <= totalDays; day += 1) {
+      const dayKey = `${monthKey}-${String(day).padStart(2, '0')}`
+      const partidos = partidosPorDia.get(dayKey) || []
+      cells.push({
+        key: dayKey,
+        empty: false,
+        day,
+        partidos,
+      })
+    }
+
+    while (cells.length % 7 !== 0) {
+      cells.push({ key: `${monthKey}-empty-end-${cells.length}`, empty: true })
+    }
+
+    return {
+      key: monthKey,
+      label: etiquetaMes(year, month),
+      cells,
+    }
+  })
+})
+
+const historialMesesVisibles = computed(() => historialPorMes.value.slice(0, mesesHistorialVisibles.value))
+const hayMasMeses = computed(() => mesesHistorialVisibles.value < historialPorMes.value.length)
+
+const verMasMeses = () => {
+  mesesHistorialVisibles.value = Math.min(mesesHistorialVisibles.value + 2, historialPorMes.value.length)
+}
+
+const verMenosMeses = () => {
+  mesesHistorialVisibles.value = 2
+}
+
+const seleccionarDiaHistorial = (cell) => {
+  if (!cell || cell.empty) return
+  diaSeleccionadoKey.value = cell.key
+  mostrandoDetalleDia.value = true
+}
+
+const volverAlCalendario = () => {
+  mostrandoDetalleDia.value = false
+}
+
+const diaSeleccionadoKeyEfectivo = computed(() => {
+  if (diaSeleccionadoKey.value) return diaSeleccionadoKey.value
+
+  for (const mes of historialMesesVisibles.value) {
+    const conPartidos = mes.cells.find((c) => !c.empty && Array.isArray(c.partidos) && c.partidos.length > 0)
+    if (conPartidos) return conPartidos.key
+  }
+
+  for (const mes of historialMesesVisibles.value) {
+    const primerDia = mes.cells.find((c) => !c.empty)
+    if (primerDia) return primerDia.key
+  }
+
+  return ''
+})
+
+const diaSeleccionadoLabel = computed(() => {
+  const key = diaSeleccionadoKeyEfectivo.value
+  if (!key) return 'Sin día seleccionado'
+  const [year, month, day] = key.split('-').map(Number)
+  const date = new Date(year, (month || 1) - 1, day || 1)
+  return new Intl.DateTimeFormat('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+})
+
+const diaSeleccionadoPartidos = computed(() => {
+  const key = diaSeleccionadoKeyEfectivo.value
+  if (!key) return []
+
+  for (const mes of historialPorMes.value) {
+    const match = mes.cells.find((c) => c.key === key)
+    if (match && !match.empty) return match.partidos || []
+  }
+
+  return []
+})
+
 const victoriasCount = computed(() => historialPartidos.value.filter((p) => p.resultadoParaUsuario === 'VICTORIA').length)
 const empatesCount = computed(() => historialPartidos.value.filter((p) => p.resultadoParaUsuario === 'EMPATE').length)
 const derrotasCount = computed(() => historialPartidos.value.filter((p) => p.resultadoParaUsuario === 'DERROTA').length)
@@ -121,6 +265,7 @@ const formatearResultado = (resultado) => {
     VICTORIA: 'Victoria',
     DERROTA: 'Derrota',
     EMPATE: 'Empate',
+    SIN_PARTICIPACION: 'Sin participacion',
   }
   return map[resultado] || resultado || '-'
 }
@@ -192,7 +337,7 @@ onMounted(cargarPerfil)
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto space-y-3">
+  <div class="max-w-6xl mx-auto space-y-3">
 
     <section v-if="loading" class="card-surface p-6 text-sm text-slate-600">
       Cargando perfil...
@@ -322,29 +467,190 @@ onMounted(cargarPerfil)
             Este usuario aún no tiene partidos finalizados visibles.
           </div>
 
-          <div v-else class="space-y-2.5 mt-3">
-            <div v-for="partido in historialPartidos" :key="partido.id" :class="['relative rounded-xl border px-3 py-2.5 pr-14 flex items-center justify-between gap-3', claseBannerResultado(partido.resultadoParaUsuario)]">
-              <div v-if="Number(partido.vecesDiferencial || 0) > 0" class="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-amber-500/90 text-white border border-amber-300 px-2 py-0.5 text-[10px] font-bold" title="Veces votado como diferencial">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.3l-6.16 3.24 1.18-6.88L2 8.86l6.92-1L12 1.6l3.08 6.26 6.92 1-5.02 4.8 1.18 6.88z"/></svg>
-                <span>x{{ Number(partido.vecesDiferencial || 0) }}</span>
+          <div v-else class="mt-3">
+            <transition name="history-switch" mode="out-in">
+            <div v-if="!mostrandoDetalleDia" key="calendar" class="space-y-3">
+              <div class="flex items-center justify-between gap-2 text-xs text-slate-500">
+                <span>Vista mensual</span>
+                <span>{{ historialMesesVisibles.length }} / {{ historialPorMes.length }} meses</span>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="font-semibold truncate">{{ partido.lugar }}</p>
-                <p class="text-xs md:text-sm opacity-90 truncate">{{ formatearFecha(partido.fecha) }}</p>
-                <div class="mt-1 flex flex-wrap gap-1">
-                  <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/20 text-white border border-white/40">Intensidad: {{ formatearIntensidad(partido.intensidadPartido) }}</span>
-                  <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/20 text-white border border-white/40">Balanceo: {{ Number(partido.porcentajeBalanceo || 0).toFixed(0) }}%</span>
-                </div>
+
+              <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <article
+                  v-for="mes in historialMesesVisibles"
+                  :key="mes.key"
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <h4 class="text-sm font-semibold text-slate-800 mb-2 capitalize">{{ mes.label }}</h4>
+                  <div class="grid grid-cols-7 gap-1 mb-1">
+                    <span v-for="dia in diasSemana" :key="`${mes.key}-${dia}`" class="text-[10px] font-semibold text-slate-500 text-center">{{ dia }}</span>
+                  </div>
+                  <div class="grid grid-cols-7 gap-1">
+                    <div
+                      v-for="cell in mes.cells"
+                      :key="cell.key"
+                      class="calendar-cell"
+                      :class="[
+                        cell.empty ? 'calendar-cell-empty' : claseDiaCalendario(cell.partidos, cell.key),
+                        !cell.empty ? 'calendar-cell-clickable' : '',
+                        !cell.empty && cell.key === diaSeleccionadoKeyEfectivo ? 'calendar-cell-selected' : ''
+                      ]"
+                      :title="cell.empty ? '' : `${cell.partidos.length} partidos`"
+                      @click="seleccionarDiaHistorial(cell)"
+                      @keydown.enter.prevent="seleccionarDiaHistorial(cell)"
+                      @keydown.space.prevent="seleccionarDiaHistorial(cell)"
+                      :tabindex="cell.empty ? -1 : 0"
+                    >
+                      <template v-if="!cell.empty">
+                        <span :class="['text-[11px] font-semibold leading-none', cell.partidos.length ? 'calendar-day-number-hit' : 'calendar-day-number-idle']">{{ cell.day }}</span>
+                        <span v-if="cell.partidos.length" class="text-[9px] mt-0.5 font-semibold calendar-day-count-hit">({{ cell.partidos.length }})</span>
+                      </template>
+                    </div>
+                  </div>
+                </article>
               </div>
-              <div class="flex items-center gap-2 md:gap-3 shrink-0">
-                <p class="text-2xl md:text-3xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
-                <span class="px-2.5 py-1 rounded-full text-[11px] md:text-xs font-semibold bg-white/20 text-white border border-white/40">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
-                <span class="px-2.5 py-1 rounded-full text-[11px] md:text-xs font-semibold bg-white/20 text-white border border-white/40">{{ formatearTipoPartido(partido.tipo) }}</span>
+
+              <div class="flex gap-2">
+                <button
+                  v-if="hayMasMeses"
+                  type="button"
+                  @click="verMasMeses"
+                  class="flex-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold py-2 hover:bg-slate-100 transition"
+                >
+                  Ver más meses
+                </button>
+                <button
+                  v-if="mesesHistorialVisibles > 2"
+                  type="button"
+                  @click="verMenosMeses"
+                  class="flex-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold py-2 hover:bg-slate-100 transition"
+                >
+                  Ver menos meses
+                </button>
               </div>
             </div>
+
+            <section v-else-if="diaSeleccionadoKeyEfectivo" key="detail" class="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h5 class="text-sm font-semibold text-slate-800 capitalize">{{ diaSeleccionadoLabel }}</h5>
+                <span class="text-xs text-slate-500">{{ diaSeleccionadoPartidos.length }} partidos</span>
+              </div>
+
+              <div v-if="diaSeleccionadoPartidos.length === 0" class="text-xs text-slate-500">
+                No hay partidos registrados en este día.
+              </div>
+
+              <div v-else class="space-y-2">
+                <article
+                  v-for="partido in diaSeleccionadoPartidos"
+                  :key="`dia-${partido.id}`"
+                  :class="['rounded-lg border px-3 py-2.5 flex items-center justify-between gap-3', claseBannerResultado(partido.resultadoParaUsuario)]"
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="font-semibold truncate">{{ partido.lugar }}</p>
+                    <p class="text-xs md:text-sm opacity-90 truncate">{{ formatearFecha(partido.fecha) }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <p class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-white/20 text-white border border-white/40">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
+                  </div>
+                </article>
+              </div>
+
+              <button
+                type="button"
+                @click="volverAlCalendario"
+                class="w-full rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold py-2 hover:bg-slate-100 transition"
+              >
+                Volver al calendario
+              </button>
+            </section>
+            </transition>
           </div>
         </div>
       </section>
     </template>
   </div>
 </template>
+
+<style scoped>
+.calendar-cell {
+  min-height: 2.15rem;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+}
+
+.calendar-cell-empty {
+  background: transparent;
+}
+
+.calendar-cell-clickable {
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.calendar-cell-clickable:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.calendar-cell-clickable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
+}
+
+.calendar-cell-selected {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.45);
+}
+
+.calendar-day-empty {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #64748b;
+}
+
+.calendar-day-with-match {
+  background: rgba(147, 197, 253, 0.42);
+  border-color: rgba(96, 165, 250, 0.88);
+  color: #ffffff;
+}
+
+.calendar-day-today {
+  background: rgba(151, 240, 125, 0.46);
+  border-color: rgba(151, 240, 125, 0.95);
+  color: #ffffff;
+}
+
+.calendar-day-today-with-match {
+  background: linear-gradient(90deg, rgba(151, 240, 125, 0.6) 0 50%, rgba(147, 197, 253, 0.56) 50% 100%);
+  border-color: rgba(151, 240, 125, 0.95);
+  color: #ffffff;
+}
+
+.calendar-day-number-hit {
+  color: #ffffff;
+}
+
+.calendar-day-number-idle {
+  color: #334155;
+}
+
+.calendar-day-count-hit {
+  color: #ffffff;
+}
+
+.history-switch-enter-active,
+.history-switch-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.history-switch-enter-from,
+.history-switch-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+</style>

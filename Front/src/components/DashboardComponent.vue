@@ -29,7 +29,7 @@ const handleLogout = async () => {
     message: '¿Estás seguro de que deseas cerrar sesión?',
     confirmLabel: 'Cerrar sesión',
     cancelLabel: 'Cancelar',
-    variant: 'danger',
+    variant: 'info',
   })
 
   if (!accepted) return
@@ -130,7 +130,7 @@ watch(
         </button>
 
         <!-- Botón de cerrar sesión -->
-        <BaseButton variant="danger" size="sm" @click="handleLogout">
+        <BaseButton variant="info" size="sm" @click="handleLogout">
           Cerrar sesión
         </BaseButton>
       </div>

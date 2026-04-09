@@ -1,20 +1,20 @@
 <template>
-  <div class="space-y-2">
-    <label class="block text-sm font-semibold text-gray-700">
+  <div class="space-y-2.5">
+    <label class="block text-sm font-semibold text-slate-200">
       Disponibilidad de horarios
     </label>
-    <p class="text-xs text-gray-600 mb-1.5">Selecciona todas las que apliquen</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    <p class="text-xs text-slate-300 mb-1.5">Selecciona todas las que apliquen</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2">
       <button
         v-for="option in options"
         :key="option"
         type="button"
         @click="toggleOption(option)"
         :class="[
-          'py-2.5 px-3 rounded-lg font-medium transition-all text-xs text-left flex items-center justify-between gap-2 border',
+          'min-h-[44px] py-2.5 px-3 rounded-lg font-medium transition-all text-xs text-left flex items-center justify-between gap-2 border',
           isSelected(option)
-            ? 'bg-blue-600 text-white shadow-lg border-blue-600'
-            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+            ? 'theme-primary-surface shadow-lg border-transparent'
+            : 'theme-muted-surface text-slate-200 border-[color:rgba(151,240,125,0.16)] hover:brightness-110'
         ]"
         :aria-pressed="isSelected(option)"
         :aria-label="`Disponibilidad: ${option}`"

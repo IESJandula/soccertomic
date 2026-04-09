@@ -43,8 +43,8 @@
           <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada">
             <AppIcon name="check" :size="12" />
           </span>
-          <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm">
-            <AppIcon name="user" :size="14" />
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm" :style="teamAColor.avatarStyle">
+            <AppIcon name="user" :size="14" :style="teamAColor.iconStyle" />
           </div>
           <div>
             <p class="font-semibold text-slate-800 text-sm leading-tight">
@@ -70,18 +70,20 @@
 
     <section v-if="hayEquiposFormados" class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <!-- Equipo A -->
-      <article :class="['p-3 border-2 space-y-2.5 rounded-lg shadow-sm', teamAColor.cardBg, teamAColor.cardBorder]">
+      <article class="p-3 border-2 space-y-2.5 rounded-lg shadow-sm card-surface" :style="teamAColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 :class="['text-lg font-bold flex items-center gap-2', teamAColor.titleText]">
-            <span>{{ teamAColor.emoji }}</span>
+          <h2 class="text-lg font-bold flex items-center gap-2 text-slate-100">
+            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full" :style="teamAColor.chipStyle">
+              <AppIcon name="soccer" :size="12" :style="teamAColor.iconStyle" />
+            </span>
             <span>Equipo {{ partida.colorEquipoA || 'A' }}</span>
           </h2>
-          <span :class="['px-2.5 py-0.5 text-xs font-bold rounded-full', teamAColor.badgeBg, teamAColor.badgeText]">
+          <span class="px-2.5 py-0.5 text-xs font-bold rounded-full" :style="teamAColor.chipStyle">
             {{ partida.equipoA?.length || 0 }} / {{ partida.jugadoresPorEquipo }}
           </span>
         </div>
 
-        <div v-if="!partida.equipoA || partida.equipoA.length === 0" :class="['text-sm italic p-4 rounded-lg text-center', teamAColor.emptyText]">
+        <div v-if="!partida.equipoA || partida.equipoA.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
           Sin personas asignadas
         </div>
 
@@ -91,30 +93,31 @@
             :key="`equipo-a-${jugador.id}`"
             :class="[
               'rounded-lg p-2.5 border-2 flex items-center gap-2.5',
-              String(jugador.id) === String(currentUserId) ? ['border-black', teamAColor.playerCardBg] : [teamAColor.playerCardBg, teamAColor.playerBorder]
+              String(jugador.id) === String(currentUserId) ? 'border-black' : ''
             ]"
+            :style="teamAColor.playerRowStyle"
           >
             <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada">
               <AppIcon name="check" :size="12" />
             </span>
-            <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm', teamAColor.avatarBg]">
-              <AppIcon name="user" :size="14" />
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm" :style="teamAColor.avatarStyle">
+              <AppIcon name="user" :size="14" :style="teamAColor.iconStyle" />
             </div>
             <div>
-              <p :class="['font-semibold text-sm leading-tight', teamAColor.playerText]">
+              <p class="font-semibold text-sm leading-tight text-slate-100">
                 {{ jugador.nombre }}
                 <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 <span
                   v-if="getRolEmoji(jugador)"
-                  class="ml-1.5 inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/20 px-2 py-0.5 text-[11px] font-semibold"
-                  :class="teamAColor.playerText"
+                  class="ml-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                  :style="teamAColor.auraStyle"
                   :title="getRolTitle(jugador)"
                 >
-                  <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" /></span>
+                  <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" :style="teamAColor.iconStyle" /></span>
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p :class="['text-[11px] opacity-80', teamAColor.playerText]" v-if="jugador.skillTier || jugador.playTendency">
+              <p class="text-[11px] text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
                 {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
@@ -123,18 +126,20 @@
       </article>
 
       <!-- Equipo B -->
-      <article :class="['p-3 border-2 space-y-2.5 rounded-lg shadow-sm', teamBColor.cardBg, teamBColor.cardBorder]">
+      <article class="p-3 border-2 space-y-2.5 rounded-lg shadow-sm card-surface" :style="teamBColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 :class="['text-lg font-bold flex items-center gap-2', teamBColor.titleText]">
-            <span>{{ teamBColor.emoji }}</span>
+          <h2 class="text-lg font-bold flex items-center gap-2 text-slate-100">
+            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full" :style="teamBColor.chipStyle">
+              <AppIcon name="soccer" :size="12" :style="teamBColor.iconStyle" />
+            </span>
             <span>Equipo {{ partida.colorEquipoB || 'B' }}</span>
           </h2>
-          <span :class="['px-2.5 py-0.5 text-xs font-bold rounded-full', teamBColor.badgeBg, teamBColor.badgeText]">
+          <span class="px-2.5 py-0.5 text-xs font-bold rounded-full" :style="teamBColor.chipStyle">
             {{ partida.equipoB?.length || 0 }} / {{ partida.jugadoresPorEquipo }}
           </span>
         </div>
 
-        <div v-if="!partida.equipoB || partida.equipoB.length === 0" :class="['text-sm italic p-4 rounded-lg text-center', teamBColor.emptyText]">
+        <div v-if="!partida.equipoB || partida.equipoB.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
           Sin personas asignadas
         </div>
 
@@ -144,30 +149,31 @@
             :key="`equipo-b-${jugador.id}`"
             :class="[
               'rounded-lg p-2.5 border-2 flex items-center gap-2.5',
-              String(jugador.id) === String(currentUserId) ? ['border-black', teamBColor.playerCardBg] : [teamBColor.playerCardBg, teamBColor.playerBorder]
+              String(jugador.id) === String(currentUserId) ? 'border-black' : ''
             ]"
+            :style="teamBColor.playerRowStyle"
           >
             <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada">
               <AppIcon name="check" :size="12" />
             </span>
-            <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-sm', teamBColor.avatarBg]">
-              <AppIcon name="user" :size="14" />
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm" :style="teamBColor.avatarStyle">
+              <AppIcon name="user" :size="14" :style="teamBColor.iconStyle" />
             </div>
             <div>
-              <p :class="['font-semibold text-sm leading-tight', teamBColor.playerText]">
+              <p class="font-semibold text-sm leading-tight text-slate-100">
                 {{ jugador.nombre }}
                 <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 <span
                   v-if="getRolEmoji(jugador)"
-                  class="ml-1.5 inline-flex items-center gap-1 rounded-full border border-white/40 bg-white/20 px-2 py-0.5 text-[11px] font-semibold"
-                  :class="teamBColor.playerText"
+                  class="ml-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                  :style="teamBColor.auraStyle"
                   :title="getRolTitle(jugador)"
                 >
-                  <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" /></span>
+                  <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" :style="teamBColor.iconStyle" /></span>
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p :class="['text-[11px] opacity-80', teamBColor.playerText]" v-if="jugador.skillTier || jugador.playTendency">
+              <p class="text-[11px] text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
                 {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
@@ -205,135 +211,59 @@ const props = defineProps({
   },
 })
 
-// Color mapping for teams with complete Tailwind classes
-const colorMap = {
-  'Blanco': { 
-    cardBg: 'bg-slate-50',
-    cardBorder: 'border-slate-300',
-    titleText: 'text-slate-800',
-    badgeBg: 'bg-slate-200',
-    badgeText: 'text-slate-800',
-    playerBorder: 'border-slate-200',
-    playerCardBg: 'bg-white',
-    playerText: 'text-slate-800',
-    emptyText: 'text-slate-600',
-    avatarBg: 'bg-slate-200',
-    emoji: '' 
-  },
-  'Negro': { 
-    cardBg: 'bg-gray-900',
-    cardBorder: 'border-gray-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-gray-700',
-    badgeText: 'text-white',
-    playerBorder: 'border-gray-700',
-    playerCardBg: 'bg-gray-800',
-    playerText: 'text-white',
-    emptyText: 'text-gray-400',
-    avatarBg: 'bg-gray-700',
-    emoji: '' 
-  },
-  'Oscuro': { 
-    cardBg: 'bg-gray-900',
-    cardBorder: 'border-gray-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-gray-700',
-    badgeText: 'text-white',
-    playerBorder: 'border-gray-700',
-    playerCardBg: 'bg-gray-800',
-    playerText: 'text-white',
-    emptyText: 'text-gray-400',
-    avatarBg: 'bg-gray-700',
-    emoji: '' 
-  },
-  'Rojo': { 
-    cardBg: 'bg-red-600',
-    cardBorder: 'border-red-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-red-800',
-    badgeText: 'text-white',
-    playerBorder: 'border-red-700',
-    playerCardBg: 'bg-red-700',
-    playerText: 'text-white',
-    emptyText: 'text-red-100',
-    avatarBg: 'bg-red-800',
-    emoji: '' 
-  },
-  'Azul': { 
-    cardBg: 'bg-blue-600',
-    cardBorder: 'border-blue-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-blue-800',
-    badgeText: 'text-white',
-    playerBorder: 'border-blue-700',
-    playerCardBg: 'bg-blue-700',
-    playerText: 'text-white',
-    emptyText: 'text-blue-100',
-    avatarBg: 'bg-blue-800',
-    emoji: '' 
-  },
-  'Verde': { 
-    cardBg: 'bg-emerald-600',
-    cardBorder: 'border-emerald-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-emerald-800',
-    badgeText: 'text-white',
-    playerBorder: 'border-emerald-700',
-    playerCardBg: 'bg-emerald-700',
-    playerText: 'text-white',
-    emptyText: 'text-emerald-100',
-    avatarBg: 'bg-emerald-800',
-    emoji: '' 
-  },
-  'Amarillo': { 
-    cardBg: 'bg-yellow-400',
-    cardBorder: 'border-yellow-500',
-    titleText: 'text-yellow-900',
-    badgeBg: 'bg-yellow-600',
-    badgeText: 'text-white',
-    playerBorder: 'border-yellow-500',
-    playerCardBg: 'bg-yellow-500',
-    playerText: 'text-yellow-900',
-    emptyText: 'text-yellow-800',
-    avatarBg: 'bg-yellow-600',
-    emoji: '' 
-  },
-  'Naranja': { 
-    cardBg: 'bg-orange-600',
-    cardBorder: 'border-orange-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-orange-800',
-    badgeText: 'text-white',
-    playerBorder: 'border-orange-700',
-    playerCardBg: 'bg-orange-700',
-    playerText: 'text-white',
-    emptyText: 'text-orange-100',
-    avatarBg: 'bg-orange-800',
-    emoji: '' 
-  },
-  'Morado': { 
-    cardBg: 'bg-purple-600',
-    cardBorder: 'border-purple-700',
-    titleText: 'text-white',
-    badgeBg: 'bg-purple-800',
-    badgeText: 'text-white',
-    playerBorder: 'border-purple-700',
-    playerCardBg: 'bg-purple-700',
-    playerText: 'text-white',
-    emptyText: 'text-purple-100',
-    avatarBg: 'bg-purple-800',
-    emoji: '' 
-  },
+const teamPalette = {
+  Blanco: { jersey: '#ffffff', onJersey: '#111827', border: 'rgba(255, 255, 255, 0.62)', aura: 'rgba(255, 255, 255, 0.24)' },
+  Negro: { jersey: '#050505', onJersey: '#f8fafc', border: 'rgba(255, 255, 255, 0.2)', aura: 'rgba(255, 255, 255, 0.08)' },
+  Rojo: { jersey: '#ef4444', onJersey: '#ffffff', border: 'rgba(239, 68, 68, 0.55)', aura: 'rgba(239, 68, 68, 0.18)' },
+  Azul: { jersey: '#2563eb', onJersey: '#ffffff', border: 'rgba(37, 99, 235, 0.55)', aura: 'rgba(37, 99, 235, 0.18)' },
+  Verde: { jersey: '#16a34a', onJersey: '#ffffff', border: 'rgba(22, 163, 74, 0.55)', aura: 'rgba(22, 163, 74, 0.18)' },
+  Amarillo: { jersey: '#facc15', onJersey: '#111827', border: 'rgba(250, 204, 21, 0.7)', aura: 'rgba(250, 204, 21, 0.2)' },
+  Naranja: { jersey: '#f97316', onJersey: '#ffffff', border: 'rgba(249, 115, 22, 0.55)', aura: 'rgba(249, 115, 22, 0.18)' },
+  Morado: { jersey: '#a855f7', onJersey: '#ffffff', border: 'rgba(168, 85, 247, 0.55)', aura: 'rgba(168, 85, 247, 0.18)' },
+}
+
+const createTeamTone = (name, fallback) => {
+  const tone = teamPalette[name] || teamPalette[fallback]
+  return {
+    cardStyle: {
+      backgroundColor: tone.jersey,
+      borderColor: tone.border,
+      boxShadow: '0 14px 30px rgba(12, 0, 5, 0.22)',
+    },
+    titleText: 'text-slate-100',
+    playerText: 'text-slate-100',
+    emptyText: 'text-slate-300',
+    chipStyle: {
+      backgroundColor: tone.jersey,
+      color: tone.onJersey,
+      boxShadow: `0 0 0 1px ${tone.border}, 0 0 16px ${tone.aura}`,
+    },
+    avatarStyle: {
+      backgroundColor: tone.jersey,
+      color: tone.onJersey,
+      boxShadow: `0 0 0 4px ${tone.aura}, 0 0 0 1px ${tone.border}`,
+    },
+    auraStyle: {
+      backgroundColor: 'rgba(151, 240, 125, 0.14)',
+      color: 'var(--color-secondary)',
+      boxShadow: '0 0 0 1px var(--color-border)',
+    },
+    playerRowStyle: {
+      backgroundColor: 'rgba(0, 0, 0, 0.14)',
+      borderColor: tone.border,
+    },
+    iconStyle: {
+      color: 'var(--color-secondary)',
+    },
+  }
 }
 
 const teamAColor = computed(() => {
-  if (!props.partida?.colorEquipoA) return colorMap['Blanco']
-  return colorMap[props.partida.colorEquipoA] || colorMap['Blanco']
+  return createTeamTone(props.partida?.colorEquipoA, 'Blanco')
 })
 
 const teamBColor = computed(() => {
-  if (!props.partida?.colorEquipoB) return colorMap['Negro']
-  return colorMap[props.partida.colorEquipoB] || colorMap['Negro']
+  return createTeamTone(props.partida?.colorEquipoB, 'Negro')
 })
 
 const jugadoresSinEquipo = computed(() => {

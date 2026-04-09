@@ -37,6 +37,12 @@ const errors = ref({
   lugar: '',
   jugadoresPorEquipo: '',
   convocarEquipoRapidoId: '',
+  colorEquipos: '',
+})
+
+const coloresDuplicados = computed(() => {
+  return String(form.value.colorEquipoA || '').trim() !== ''
+    && String(form.value.colorEquipoA || '').trim() === String(form.value.colorEquipoB || '').trim()
 })
 
 onMounted(async () => {
@@ -57,7 +63,7 @@ const jugadoresLabel = computed(() => {
 })
 
 const validateForm = () => {
-  errors.value = { fecha: '', hora: '', lugar: '', jugadoresPorEquipo: '', convocarEquipoRapidoId: '' }
+  errors.value = { fecha: '', hora: '', lugar: '', jugadoresPorEquipo: '', convocarEquipoRapidoId: '', colorEquipos: '' }
 
   if (!form.value.fecha) errors.value.fecha = 'Selecciona una fecha.'
   if (!form.value.hora) errors.value.hora = 'Selecciona una hora.'
@@ -66,6 +72,10 @@ const validateForm = () => {
   const jugadores = Number(form.value.jugadoresPorEquipo)
   if (!Number.isInteger(jugadores) || jugadores < 1 || jugadores > 11) {
     errors.value.jugadoresPorEquipo = 'Ingresa un número entre 1 y 11.'
+  }
+
+  if (coloresDuplicados.value) {
+    errors.value.colorEquipos = 'Los dos equipos no pueden tener el mismo color.'
   }
 
   if (form.value.convocarEquipoRapido) {
@@ -129,12 +139,12 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-3">
-    <section class="card-surface p-4 sm:p-5">
-      <form class="space-y-3" @submit.prevent="handleSubmit">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <BaseInput v-model="form.fecha" type="date" label="Fecha" :error="errors.fecha" :disabled="loading" />
-          <BaseInput v-model="form.hora" type="time" label="Hora" :error="errors.hora" :disabled="loading" />
+  <div class="max-w-5xl mx-auto space-y-3">
+    <section class="card-surface p-4 sm:p-5 lg:p-6">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <BaseInput v-model="form.fecha" type="date" label="Fecha" :error="errors.fecha" :disabled="loading" class="lg:col-span-2" />
+          <BaseInput v-model="form.hora" type="time" label="Hora" :error="errors.hora" :disabled="loading" class="lg:col-span-2" />
         </div>
 
         <BaseInput
@@ -144,16 +154,17 @@ const handleCancel = () => {
           :disabled="loading"
         />
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <BaseInput
             v-model="form.jugadoresPorEquipo"
             type="number"
             :label="jugadoresLabel"
             :error="errors.jugadoresPorEquipo"
             :disabled="loading"
+            class="lg:col-span-2"
           />
 
-          <label class="block">
+          <label class="block lg:col-span-2">
             <span class="block text-xs font-medium text-slate-700 mb-0.5">Tipo de partido</span>
             <select
               v-model="form.tipo"
@@ -166,8 +177,8 @@ const handleCancel = () => {
           </label>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label class="block">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label class="block lg:col-span-2">
             <span class="block text-xs font-medium text-slate-700 mb-0.5">Color Equipo A</span>
             <select
               v-model="form.colorEquipoA"
@@ -185,14 +196,13 @@ const handleCancel = () => {
             </select>
           </label>
 
-          <label class="block">
+          <label class="block lg:col-span-2">
             <span class="block text-xs font-medium text-slate-700 mb-0.5">Color Equipo B</span>
             <select
               v-model="form.colorEquipoB"
               :disabled="loading"
               class="w-full h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="Oscuro">Oscuro</option>
               <option value="Blanco">Blanco</option>
               <option value="Negro">Negro</option>
               <option value="Rojo">Rojo</option>
@@ -203,6 +213,8 @@ const handleCancel = () => {
               <option value="Morado">Morado</option>
             </select>
           </label>
+
+          <p v-if="errors.colorEquipos" class="sm:col-span-2 lg:col-span-4 text-xs text-red-700 mt-1">{{ errors.colorEquipos }}</p>
         </div>
 
         <section class="rounded-xl border border-slate-200 p-3 space-y-2">
@@ -216,8 +228,8 @@ const handleCancel = () => {
             <span class="text-sm font-medium text-slate-800">Convocar directamente a mi equipo</span>
           </label>
 
-          <div v-if="form.convocarEquipoRapido" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label class="block">
+          <div v-if="form.convocarEquipoRapido" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label class="block lg:col-span-2">
               <span class="block text-xs font-medium text-slate-700 mb-0.5">Equipo guardado</span>
               <select
                 v-model="form.convocarEquipoRapidoId"
@@ -233,7 +245,7 @@ const handleCancel = () => {
               <p v-else-if="misEquipos.length === 0" class="text-xs text-slate-500 mt-1">No tienes equipos guardados en Mis amistades.</p>
             </label>
 
-            <label class="block">
+            <label class="block lg:col-span-2">
               <span class="block text-xs font-medium text-slate-700 mb-0.5">Asignar convocados a</span>
               <select
                 v-model="form.equipoDestinoConvocado"
@@ -247,9 +259,9 @@ const handleCancel = () => {
           </div>
         </section>
 
-        <div class="grid grid-cols-2 gap-3 pt-1">
-          <BaseButton variant="secondary" block :disabled="loading" @click="handleCancel">Cancelar</BaseButton>
-          <BaseButton variant="primary" block :loading="loading" :disabled="loading">Crear partido</BaseButton>
+        <div class="grid grid-cols-2 gap-3 pt-2 sm:max-w-sm sm:ml-auto">
+          <BaseButton type="button" variant="secondary" block :disabled="loading" @click="handleCancel">Cancelar</BaseButton>
+          <BaseButton type="submit" variant="primary" block :loading="loading" :disabled="loading || coloresDuplicados">Crear partido</BaseButton>
         </div>
       </form>
     </section>

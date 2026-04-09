@@ -102,7 +102,7 @@ public class PartidoEntity {
     private String colorEquipoA = "Blanco"; // Color del equipo A (por defecto Blanco)
 
     @Column(nullable = false)
-    private String colorEquipoB = "Oscuro"; // Color del equipo B (por defecto Oscuro)
+    private String colorEquipoB = "Negro"; // Color del equipo B (por defecto Negro)
 
     // Timestamps
     @CreationTimestamp

@@ -52,6 +52,11 @@ public class PartidoController {
     @Autowired
     private InvitacionService invitacionService;
 
+    private String normalizeTeamColor(String color, String fallback) {
+        String selected = color == null || color.isBlank() ? fallback : color;
+        return "Oscuro".equalsIgnoreCase(selected) ? "Negro" : selected;
+    }
+
     private List<PartidoOrganizadorDTO> mapOrganizadores(PartidoEntity partido) {
         List<PartidoOrganizadorEntity> relaciones = partidoService.obtenerOrganizadores(partido.getId());
         return relaciones.stream()
@@ -81,8 +86,8 @@ public class PartidoController {
                 partido.getEquipoA().size(),
                 partido.getEquipoB().size(),
                 totalJugadores,
-                partido.getColorEquipoA(),
-                partido.getColorEquipoB(),
+                normalizeTeamColor(partido.getColorEquipoA(), "Blanco"),
+                normalizeTeamColor(partido.getColorEquipoB(), "Negro"),
                 partido.getCreadoEn(),
                 partido.getActualizadoEn()
         );
@@ -112,8 +117,8 @@ public class PartidoController {
                 partido.getJugadoresInscritos().size() + partido.getEquipoA().size() + partido.getEquipoB().size(),
                 partido.getJugadoresInscritos().size() + partido.getEquipoA().size() + partido.getEquipoB().size() < partido.getJugadoresPorEquipo() * 2,
                 estaInscrito,
-                partido.getColorEquipoA(),
-                partido.getColorEquipoB(),
+                normalizeTeamColor(partido.getColorEquipoA(), "Blanco"),
+                normalizeTeamColor(partido.getColorEquipoB(), "Negro"),
                 partido.getCreadoEn(),
                 partido.getActualizadoEn()
         );
@@ -141,9 +146,9 @@ public class PartidoController {
                 com.worldcup.Back.entity.enums.TipoPartido.PUBLICO : 
                 com.worldcup.Back.entity.enums.TipoPartido.PRIVADO);
         }
-        // Asignar colores de equipos (por defecto Blanco y Oscuro si no se especifican)
-        partido.setColorEquipoA(dto.getColorEquipoA() != null ? dto.getColorEquipoA() : "Blanco");
-        partido.setColorEquipoB(dto.getColorEquipoB() != null ? dto.getColorEquipoB() : "Oscuro");
+        // Asignar colores de equipos (por defecto Blanco y Negro si no se especifican)
+        partido.setColorEquipoA(normalizeTeamColor(dto.getColorEquipoA(), "Blanco"));
+        partido.setColorEquipoB(normalizeTeamColor(dto.getColorEquipoB(), "Negro"));
         
         PartidoEntity creado = partidoService.crearPartido(partido, creador.get());
         creado = partidoService.inscribirOwnerInicial(creado.getId(), creador.get());

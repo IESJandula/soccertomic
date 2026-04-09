@@ -1,9 +1,12 @@
 package com.worldcup.Back.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
@@ -16,6 +19,8 @@ import java.util.Map;
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Object> handleResourceNotFoundException(
@@ -59,6 +64,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(
             Exception ex, WebRequest request) {
+        if (isClientAbort(ex)) {
+            // Client disconnected before the response finished writing.
+            // This is a network/client-side condition, not a server fault.
+            LOGGER.debug("Client aborted request while writing response: {}", request.getDescription(false));
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
@@ -66,9 +78,35 @@ public class GlobalExceptionHandler {
         body.put("message", "An unexpected error occurred");
         body.put("path", request.getDescription(false).replace("uri=", ""));
         
-        // Log the full exception for debugging (in production, use proper logging)
-        ex.printStackTrace();
+        LOGGER.error("Unhandled exception for {}", request.getDescription(false), ex);
         
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private boolean isClientAbort(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof AsyncRequestNotUsableException) {
+                return true;
+            }
+
+            String className = current.getClass().getName();
+            if (className.contains("ClientAbortException")) {
+                return true;
+            }
+
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("connection reset")
+                        || lower.contains("broken pipe")
+                        || lower.contains("se ha anulado una conexión")) {
+                    return true;
+                }
+            }
+
+            current = current.getCause();
+        }
+        return false;
     }
 }

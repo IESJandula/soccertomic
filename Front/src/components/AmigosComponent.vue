@@ -278,7 +278,7 @@ const eliminarEquipoRapido = async (equipo) => {
     <template v-else>
       <section v-if="solicitudesEnviadas.length > 0" class="card-surface p-4 md:p-5">
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="send" :size="18" />Solicitudes enviadas ({{ solicitudesEnviadas.length }})</h3>
-        <div class="space-y-2 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="solicitud in solicitudesEnviadas" :key="solicitud.id" class="border border-slate-200 rounded-xl p-3">
             <p class="font-semibold text-slate-800">{{ solicitud.usuarioB.nombre }}</p>
             <p class="text-xs text-slate-500">Esperando respuesta de {{ solicitud.usuarioB.email }}</p>
@@ -349,7 +349,7 @@ const eliminarEquipoRapido = async (equipo) => {
             <p class="text-caption mt-1">Usa el buscador para enviar solicitudes.</p>
           </div>
 
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
             <article v-for="amistad in amigos" :key="amistad.id" class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <p class="font-semibold text-slate-800 truncate">{{ getOtroUsuario(amistad).nombre }}</p>
@@ -414,7 +414,7 @@ const eliminarEquipoRapido = async (equipo) => {
 
         <div v-if="misEquiposDesplegados" class="space-y-3">
           <div v-if="creandoEquipo" class="space-y-2">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               <label class="block">
                 <span class="block text-sm font-semibold text-slate-700 mb-1.5">Capacidad del equipo</span>
                 <select
@@ -439,7 +439,7 @@ const eliminarEquipoRapido = async (equipo) => {
             <div v-if="amigos.length === 0" class="text-sm text-slate-500">
               Necesitas amistades confirmadas para crear un equipo rapido.
             </div>
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
               <button
                 v-for="amistad in amigos"
                 :key="`equipo-${amistad.id}`"
@@ -482,7 +482,7 @@ const eliminarEquipoRapido = async (equipo) => {
             <p class="text-caption mt-1">Usa "Nuevo equipo" para crear uno con tu lista de amistades.</p>
           </div>
 
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             <article v-for="equipo in misEquipos" :key="equipo.id" class="border border-slate-200 rounded-xl p-3 space-y-2">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -517,7 +517,7 @@ const eliminarEquipoRapido = async (equipo) => {
         <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Personas recientes ({{ ultimasPersonas.length }})</h3>
         <p class="text-xs text-slate-600 mt-1">Personas con las que has compartido partido (aún no son amistades)</p>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="persona in ultimasPersonas" :key="persona.id" class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="font-semibold text-slate-800 truncate">{{ persona.nombre }}</p>

@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-2">
-    <label class="block text-sm font-semibold text-gray-700">
+    <label class="block text-sm font-semibold text-slate-200">
       Pierna buena
     </label>
     <div class="grid grid-cols-3 gap-2">
@@ -12,8 +12,8 @@
         :class="[
           'py-2 px-3 rounded-lg font-medium transition-all text-sm',
           modelValue === option
-            ? 'bg-blue-600 text-white shadow-lg'
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            ? 'theme-primary-surface shadow-lg'
+            : 'theme-muted-surface text-slate-200 hover:brightness-110'
         ]"
       >
         {{ option }}
