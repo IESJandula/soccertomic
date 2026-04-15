@@ -172,6 +172,13 @@ class PartidoService {
       useCache: false,
     })
   }
+
+  async procesarRatingPartido(partidoId) {
+    return apiService.request(`${ENDPOINTS.PARTIDOS}/${partidoId}/rating/procesar`, {
+      method: 'POST',
+      useCache: false,
+    })
+  }
 }
 
 export default new PartidoService()

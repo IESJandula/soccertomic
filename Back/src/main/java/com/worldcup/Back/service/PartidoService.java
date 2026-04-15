@@ -4,19 +4,28 @@ import com.worldcup.Back.dto.response.EquiposBalanceadosResponseDTO;
 import com.worldcup.Back.dto.response.JugadorBalanceadoDTO;
 import com.worldcup.Back.dto.response.PartidoBalanceAnalisisResponseDTO;
 import com.worldcup.Back.dto.response.PartidoHistorialDTO;
+import com.worldcup.Back.dto.request.PartidoIncidenciaRequestDTO;
+import com.worldcup.Back.dto.response.PartidoIncidenciaResponseDTO;
+import com.worldcup.Back.dto.response.PartidoIncidenciaResumenDTO;
+import com.worldcup.Back.dto.response.PartidoRatingProcesoResponseDTO;
 import com.worldcup.Back.entity.PlayerProfileEntity;
 import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.InvitacionEntity;
+import com.worldcup.Back.entity.PartidoIncidenciaEntity;
 import com.worldcup.Back.entity.PartidoOrganizadorEntity;
 import com.worldcup.Back.entity.PartidoVotacionEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.EstadoPartido;
 import com.worldcup.Back.entity.enums.PartidoOrganizadorRol;
+import com.worldcup.Back.entity.enums.TipoIncidenciaPartido;
 import com.worldcup.Back.exception.ResourceNotFoundException;
+import com.worldcup.Back.repository.PartidoIncidenciaRepository;
 import com.worldcup.Back.repository.PartidoOrganizadorRepository;
 import com.worldcup.Back.repository.PartidoRepository;
 import com.worldcup.Back.repository.PartidoVotacionRepository;
 import com.worldcup.Back.repository.UsuarioRepository;
+import com.worldcup.Back.service.level.PartidoRatingEngineService;
+import com.worldcup.Back.service.level.VisibleLevelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +69,9 @@ public class PartidoService {
     private PartidoVotacionRepository partidoVotacionRepository;
 
     @Autowired
+    private PartidoIncidenciaRepository partidoIncidenciaRepository;
+
+    @Autowired
     private PlayerProfileService playerProfileService;
 
     @Autowired
@@ -67,6 +79,12 @@ public class PartidoService {
 
     @Autowired
     private InvitacionService invitacionService;
+
+    @Autowired
+    private PartidoRatingEngineService partidoRatingEngineService;
+
+    @Autowired
+    private VisibleLevelService visibleLevelService;
 
     private Optional<PartidoOrganizadorEntity> buscarRelacionOrganizador(PartidoEntity partido, UsuarioEntity usuario) {
         return partidoOrganizadorRepository.findByPartidoAndUsuario(partido, usuario);
@@ -92,6 +110,17 @@ public class PartidoService {
         if (!esOrganizador(partido, usuario)) {
             throw new RuntimeException(mensaje);
         }
+    }
+
+    private boolean esParticipante(PartidoEntity partido, UsuarioEntity usuario) {
+        if (partido == null || usuario == null || usuario.getId() == null) {
+            return false;
+        }
+
+        Long usuarioId = usuario.getId();
+        return (partido.getJugadoresInscritos() != null && partido.getJugadoresInscritos().stream().anyMatch(u -> usuarioId.equals(u.getId())))
+                || (partido.getEquipoA() != null && partido.getEquipoA().stream().anyMatch(u -> usuarioId.equals(u.getId())))
+                || (partido.getEquipoB() != null && partido.getEquipoB().stream().anyMatch(u -> usuarioId.equals(u.getId())));
     }
 
     private void establecerOwnerUnico(PartidoEntity partido, Long ownerUsuarioId) {
@@ -317,6 +346,9 @@ public class PartidoService {
             if (datosActualizados.getJugadoresPorEquipo() != null) p.setJugadoresPorEquipo(datosActualizados.getJugadoresPorEquipo());
             if (datosActualizados.getDuracionMinutos() != null && datosActualizados.getDuracionMinutos() > 0) {
                 p.setDuracionMinutos(datosActualizados.getDuracionMinutos());
+            }
+            if (datosActualizados.getModoEquipos() != null && !datosActualizados.getModoEquipos().isBlank()) {
+                p.setModoEquipos("AUTO".equalsIgnoreCase(datosActualizados.getModoEquipos()) ? "AUTO" : "MANUAL");
             }
             p.setActualizadoEn(LocalDateTime.now());
             return partidoRepository.save(p);
@@ -709,6 +741,262 @@ public class PartidoService {
         );
     }
 
+    @Transactional
+    public PartidoRatingProcesoResponseDTO procesarRatingPartido(Long partidoId, UsuarioEntity solicitante) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede procesar rating del partido");
+
+        if (Boolean.TRUE.equals(partido.getRatingProcesado())) {
+            return new PartidoRatingProcesoResponseDTO(
+                    partido.getId(),
+                    true,
+                    false,
+                    partido.getRatingSnapshotVersion() == null ? "trueskill-adapted-v1" : partido.getRatingSnapshotVersion(),
+                    "YA_PROCESADO",
+                    0,
+                    0,
+                    0,
+                    partido.getEstadoCalidad(),
+                    "El rating de este partido ya fue procesado previamente",
+                    partido.getRatingProcesadoEn()
+            );
+        }
+
+        if (partido.getEstado() == null || !partido.getEstado().isFinalizado()) {
+            throw new IllegalArgumentException("El rating solo puede procesarse cuando el partido está finalizado");
+        }
+
+        PartidoRatingEngineService.EngineResult engineResult = partidoRatingEngineService.procesar(partido);
+        if ("SIN_DATOS".equals(engineResult.resultadoResolucion()) || "SIN_EQUIPOS".equals(engineResult.resultadoResolucion())) {
+            return new PartidoRatingProcesoResponseDTO(
+                    partido.getId(),
+                    false,
+                    false,
+                    "trueskill-adapted-v1",
+                    engineResult.resultadoResolucion(),
+                    0,
+                    engineResult.votosConsiderados(),
+                    engineResult.votosAtipicos(),
+                    partido.getEstadoCalidad(),
+                    "No se pudo procesar rating por falta de datos de resultado o equipos",
+                    null
+            );
+        }
+
+        usuarioRepository.saveAll(engineResult.usuariosActualizados());
+
+        partido.setRatingProcesado(true);
+        partido.setRatingProcesadoEn(LocalDateTime.now());
+        partido.setRatingSnapshotVersion("trueskill-adapted-v1");
+        partido.setActualizadoEn(LocalDateTime.now());
+        partidoRepository.save(partido);
+
+        return new PartidoRatingProcesoResponseDTO(
+                partido.getId(),
+                false,
+                true,
+                "trueskill-adapted-v1",
+                engineResult.resultadoResolucion(),
+                engineResult.jugadoresActualizados(),
+            engineResult.votosConsiderados(),
+            engineResult.votosAtipicos(),
+                partido.getEstadoCalidad(),
+                "Rating procesado correctamente",
+                partido.getRatingProcesadoEn()
+        );
+    }
+
+    @Transactional
+    public PartidoIncidenciaResponseDTO registrarIncidencia(Long partidoId, UsuarioEntity solicitante, PartidoIncidenciaRequestDTO dto) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede registrar incidencias");
+
+        Long usuarioAfectadoId = dto.getUsuarioId() != null ? dto.getUsuarioId() : solicitante.getId();
+        UsuarioEntity usuarioAfectado = usuarioRepository.findById(usuarioAfectadoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", usuarioAfectadoId));
+
+        if (!esParticipante(partido, usuarioAfectado)) {
+            throw new IllegalArgumentException("La incidencia debe asociarse a una persona del partido");
+        }
+
+        if (dto.getMinuto() != null && dto.getMinuto() < 0) {
+            throw new IllegalArgumentException("El minuto de incidencia no puede ser negativo");
+        }
+
+        PartidoIncidenciaEntity entity = new PartidoIncidenciaEntity();
+        entity.setPartido(partido);
+        entity.setUsuarioAfectado(usuarioAfectado);
+        entity.setReportadoPor(solicitante);
+        entity.setTipoIncidencia(TipoIncidenciaPartido.fromRaw(dto.getTipoIncidencia()));
+        entity.setSeveridad(dto.getSeveridad() == null ? 2 : Math.max(1, Math.min(3, dto.getSeveridad())));
+        entity.setMinuto(dto.getMinuto());
+        entity.setComentario(dto.getComentario());
+        entity.setValidadaPorOrganizador(true);
+
+        PartidoIncidenciaEntity saved = partidoIncidenciaRepository.save(entity);
+        recalcularCalidadPartido(partido);
+        return toIncidenciaResponseDTO(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PartidoIncidenciaResponseDTO> obtenerIncidencias(Long partidoId, UsuarioEntity solicitante) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede ver incidencias detalladas");
+
+        return partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido)
+                .stream()
+                .map(this::toIncidenciaResponseDTO)
+                .toList();
+    }
+
+    @Transactional
+    public PartidoIncidenciaResumenDTO obtenerResumenIncidencias(Long partidoId, UsuarioEntity solicitante) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        if (!esOrganizador(partido, solicitante) && !esParticipante(partido, solicitante)) {
+            throw new RuntimeException("No tienes permisos para ver el resumen operativo de incidencias");
+        }
+
+        recalcularCalidadPartido(partido);
+
+        List<PartidoIncidenciaEntity> incidencias = partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido);
+        int lesiones = (int) incidencias.stream().filter(i -> i.getTipoIncidencia() == TipoIncidenciaPartido.LESION).count();
+        int abandonos = (int) incidencias.stream().filter(i -> i.getTipoIncidencia() == TipoIncidenciaPartido.ABANDONO).count();
+        int ausencias = (int) incidencias.stream().filter(i -> i.getTipoIncidencia() == TipoIncidenciaPartido.AUSENCIA).count();
+        int conducta = (int) incidencias.stream().filter(i -> i.getTipoIncidencia() == TipoIncidenciaPartido.CONDUCTA).count();
+        int otros = (int) incidencias.stream().filter(i -> i.getTipoIncidencia() == TipoIncidenciaPartido.OTRO).count();
+
+        return new PartidoIncidenciaResumenDTO(
+                partido.getId(),
+                incidencias.size(),
+                lesiones,
+                abandonos,
+                ausencias,
+                conducta,
+                otros,
+                partido.getEstadoCalidad(),
+                partido.getScoreCalidad(),
+                partido.getParticipacionVotacion()
+        );
+    }
+
+    private PartidoIncidenciaResponseDTO toIncidenciaResponseDTO(PartidoIncidenciaEntity entity) {
+        return new PartidoIncidenciaResponseDTO(
+                entity.getId(),
+                entity.getPartido().getId(),
+                entity.getUsuarioAfectado().getId(),
+                entity.getUsuarioAfectado().getNombre(),
+                entity.getReportadoPor().getId(),
+                entity.getReportadoPor().getNombre(),
+                entity.getTipoIncidencia().name(),
+                entity.getSeveridad(),
+                entity.getMinuto(),
+                entity.getComentario(),
+                entity.getValidadaPorOrganizador(),
+                entity.getCreadaEn()
+        );
+    }
+
+    private void recalcularCalidadPartido(PartidoEntity partido) {
+        List<PartidoIncidenciaEntity> incidencias = partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido);
+        List<PartidoVotacionEntity> votos = partidoVotacionRepository.findByPartido(partido);
+
+        int participantes = Math.max(1, partido.getTotalJugadoresEnEquipos() != null && partido.getTotalJugadoresEnEquipos() > 0
+                ? partido.getTotalJugadoresEnEquipos()
+                : partido.getTotalJugadores());
+
+        BigDecimal participacion = BigDecimal.valueOf(votos.size())
+                .divide(BigDecimal.valueOf(participantes), 3, RoundingMode.HALF_UP);
+
+        double impactoBruto = incidencias.stream()
+                .mapToDouble(this::pesoIncidencia)
+                .sum();
+
+        double impactoNormalizado = Math.min(1.0, impactoBruto / participantes);
+        double participacionDouble = participacion.doubleValue();
+
+        String estadoCalidad;
+        if (participacionDouble == 0.0) {
+            estadoCalidad = "SEMI_ALTERADO";
+        } else if (participacionDouble < 0.30) {
+            estadoCalidad = "ALTERADO";
+        } else if (participacionDouble < 0.70) {
+            estadoCalidad = "SEMI_ALTERADO";
+        } else {
+            estadoCalidad = "NORMAL";
+        }
+
+        if (impactoNormalizado >= 0.70) {
+            estadoCalidad = "ALTERADO";
+        } else if (impactoNormalizado >= 0.35 && "NORMAL".equals(estadoCalidad)) {
+            estadoCalidad = "SEMI_ALTERADO";
+        }
+
+        List<PartidoVotacionEntity> votosConOpinionAlterado = votos.stream()
+                .filter(v -> v.getPartidoAlterado() != null)
+                .toList();
+        if (!votosConOpinionAlterado.isEmpty()) {
+            long votosAlterado = votosConOpinionAlterado.stream().filter(v -> Boolean.TRUE.equals(v.getPartidoAlterado())).count();
+            double consensoAlterado = votosAlterado / (double) votosConOpinionAlterado.size();
+
+            if (consensoAlterado > 0.60) {
+                estadoCalidad = "ALTERADO";
+            } else if (consensoAlterado >= 0.40) {
+                estadoCalidad = "SEMI_ALTERADO";
+            } else if ("ALTERADO".equals(estadoCalidad) && impactoNormalizado < 0.70) {
+                estadoCalidad = "SEMI_ALTERADO";
+            }
+
+            double participacionAlterado = votosConOpinionAlterado.size() / (double) participantes;
+            if (participacionAlterado < 0.60 && !incidencias.isEmpty()) {
+                estadoCalidad = promoverUnNivel(estadoCalidad);
+            }
+        }
+
+        double score = switch (estadoCalidad) {
+            case "ALTERADO" -> Math.max(0.10, 0.35 - (impactoNormalizado * 0.20));
+            case "SEMI_ALTERADO" -> Math.max(0.40, 0.70 - (impactoNormalizado * 0.30));
+            default -> Math.max(0.70, 1.0 - (impactoNormalizado * 0.25));
+        };
+
+        partido.setParticipacionVotacion(BigDecimal.valueOf(participacionDouble).setScale(3, RoundingMode.HALF_UP));
+        partido.setScoreCalidad(BigDecimal.valueOf(score).setScale(3, RoundingMode.HALF_UP));
+        partido.setEstadoCalidad(estadoCalidad);
+        partido.setActualizadoEn(LocalDateTime.now());
+        partidoRepository.save(partido);
+    }
+
+    private String promoverUnNivel(String estadoActual) {
+        if ("NORMAL".equals(estadoActual)) {
+            return "SEMI_ALTERADO";
+        }
+        if ("SEMI_ALTERADO".equals(estadoActual)) {
+            return "ALTERADO";
+        }
+        return "ALTERADO";
+    }
+
+    private double pesoIncidencia(PartidoIncidenciaEntity incidencia) {
+        double base = switch (incidencia.getTipoIncidencia()) {
+            case LESION -> 0.22;
+            case ABANDONO -> 0.28;
+            case AUSENCIA -> 0.18;
+            case CONDUCTA -> 0.26;
+            case OTRO -> 0.12;
+        };
+
+        double severidad = incidencia.getSeveridad() == null ? 2.0 : incidencia.getSeveridad().doubleValue();
+        double factorSeveridad = Math.max(1.0, Math.min(3.0, severidad)) / 3.0;
+        return base * factorSeveridad;
+    }
+
     @Transactional(readOnly = true)
     public com.worldcup.Back.dto.response.BalanceResultDTO asignarPosicionesSinRedistribuir(Long partidoId, String formacion) {
         PartidoEntity partido = partidoRepository.findById(partidoId)
@@ -850,18 +1138,50 @@ public class PartidoService {
     }
 
     private BalanceCandidate toCandidate(UsuarioEntity usuario) {
-        // Obtener posiciones del usuario base
-        List<String> posiciones = usuario.getPosiciones() == null 
-                ? List.of() 
-                : usuario.getPosiciones()
+        // Priorizar posiciones explícitas del usuario y complementar con perfil futbolista.
+        List<String> posiciones = new ArrayList<>();
+        if (usuario.getPosiciones() != null) {
+            posiciones.addAll(
+                usuario.getPosiciones()
                     .stream()
                     .map(this::normalizePosition)
                     .filter(POSICIONES_CLAVE::contains)
                     .distinct()
-                    .toList();
+                    .toList()
+            );
+        }
+
+        PlayerProfileEntity profile = usuario.getPlayerProfile();
+        if (profile != null) {
+            String posicionPreferida = normalizePosition(profile.getPosicionPreferida());
+            if (POSICIONES_CLAVE.contains(posicionPreferida) && !posiciones.contains(posicionPreferida)) {
+                posiciones.add(posicionPreferida);
+            }
+
+            if (Boolean.TRUE.equals(profile.getGoalkeeper()) && !posiciones.contains("ARQUERO")) {
+                posiciones.add("ARQUERO");
+            }
+
+            if (posiciones.isEmpty()) {
+                String tendencia = profile.getPlayTendency() == null ? "" : profile.getPlayTendency().trim().toUpperCase();
+                if ("PORTERO".equals(tendencia)) {
+                    posiciones.add("ARQUERO");
+                } else if ("DEFENSIVA".equals(tendencia)) {
+                    posiciones.add("DEFENSA");
+                } else if ("OFENSIVA".equals(tendencia)) {
+                    posiciones.add("DELANTERO");
+                } else {
+                    posiciones.add("MEDIOCAMPISTA");
+                }
+            }
+        }
 
         String primary = posiciones.isEmpty() ? "MEDIOCAMPISTA" : posiciones.get(0);
-        int level = playerProfileService.getPlayerLevel(usuario);
+        int levelBase = visibleLevelService.calcularNivelVisible(usuario).setScale(0, RoundingMode.HALF_UP).intValue();
+        if (levelBase <= 0) {
+            levelBase = 1;
+        }
+        int level = aplicarAjusteFiabilidad(levelBase, usuario);
 
         return new BalanceCandidate(usuario, level, primary, new HashSet<>(posiciones));
     }
@@ -870,7 +1190,39 @@ public class PartidoService {
         if (raw == null || raw.isBlank()) {
             return "MEDIOCAMPISTA";
         }
-        return raw.trim().toUpperCase();
+        String value = raw.trim().toUpperCase();
+        return switch (value) {
+            case "GK", "PORTERO", "ARQUERO" -> "ARQUERO";
+            case "DF", "DEFENSA", "DEFENDER" -> "DEFENSA";
+            case "MF", "MEDIO", "MEDIOCAMPISTA" -> "MEDIOCAMPISTA";
+            case "FW", "DELANTERO", "ATACANTE" -> "DELANTERO";
+            default -> value;
+        };
+    }
+
+    private int aplicarAjusteFiabilidad(int levelBase, UsuarioEntity usuario) {
+        int noShows = usuario.getNoShows() == null ? 0 : usuario.getNoShows();
+        int abandonos = usuario.getAbandonos() == null ? 0 : usuario.getAbandonos();
+
+        BigDecimal fiabilidad = usuario.getFiabilidadScore() == null ? BigDecimal.ONE : usuario.getFiabilidadScore();
+        if (fiabilidad.compareTo(BigDecimal.ONE) > 0) {
+            fiabilidad = fiabilidad.divide(new BigDecimal("100.00"), 4, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal penalizacionIncidencias = BigDecimal.valueOf((noShows * 0.06) + (abandonos * 0.04));
+        BigDecimal factor = fiabilidad.subtract(penalizacionIncidencias);
+        if (factor.compareTo(new BigDecimal("0.65")) < 0) {
+            factor = new BigDecimal("0.65");
+        }
+        if (factor.compareTo(BigDecimal.ONE) > 0) {
+            factor = BigDecimal.ONE;
+        }
+
+        int adjusted = BigDecimal.valueOf(levelBase)
+                .multiply(factor)
+                .setScale(0, RoundingMode.HALF_UP)
+                .intValue();
+        return Math.max(1, adjusted);
     }
 
     private JugadorBalanceadoDTO toJugadorBalanceadoDTO(BalanceCandidate candidate) {

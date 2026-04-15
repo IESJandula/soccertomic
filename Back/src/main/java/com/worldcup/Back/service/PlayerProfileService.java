@@ -13,8 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -98,30 +96,52 @@ public class PlayerProfileService {
     }
 
     private void mapAttributes(PlayerProfileEntity entity, PlayerProfileRequestDTO.AttributesDTO attributes) {
-        entity.setShooting(attributes.getShooting());
-        entity.setSpeed(attributes.getSpeed());
-        entity.setDribbling(attributes.getDribbling());
-        entity.setDefense(attributes.getDefense());
-        entity.setStrength(attributes.getStrength());
-        entity.setStamina(attributes.getStamina());
-        entity.setAerial(attributes.getAerial());
-        entity.setGoalkeeper(attributes.getGoalkeeper());
-        entity.setPosicionPreferida(attributes.getPosicionPreferida());
-        entity.setPlayStyle(attributes.getPlayStyle());
-        entity.setSkillTier(attributes.getSkillTier());
-        entity.setAgeRange(attributes.getAgeRange());
-        entity.setPiernaBuena(attributes.getPiernaBuena());
-        
-        // Store disponibilidad as JSON string
-        if (attributes.getDisponibilidad() != null && !attributes.getDisponibilidad().isEmpty()) {
-            entity.setDisponibilidad(String.join(",", attributes.getDisponibilidad()));
+        if (attributes == null) {
+            return;
         }
-        
-        // Calcular tendencia de juego basada en atributos
-        entity.setPlayTendency(calculatePlayTendency(attributes));
-        
-        // Calcular rating global (incluye modificador de skillTier)
-        entity.setGlobalRating(calculateGlobalRating(attributes));
+
+        entity.setShooting(normalizeSkill(attributes.getShooting(), entity.getShooting()));
+        entity.setSpeed(normalizeSkill(attributes.getSpeed(), entity.getSpeed()));
+        entity.setDribbling(normalizeSkill(attributes.getDribbling(), entity.getDribbling()));
+        entity.setDefense(normalizeSkill(attributes.getDefense(), entity.getDefense()));
+        entity.setStrength(normalizeSkill(attributes.getStrength(), entity.getStrength()));
+        entity.setStamina(normalizeSkill(attributes.getStamina(), entity.getStamina()));
+        entity.setAerial(normalizeSkill(attributes.getAerial(), entity.getAerial()));
+
+        String posicion = firstNonBlank(attributes.getPosicionPreferida(), entity.getPosicionPreferida(), "MEDIOCAMPISTA");
+        entity.setPosicionPreferida(posicion);
+        entity.setPlayStyle(normalizePlayStyle(attributes.getPlayStyle(), entity.getPlayStyle()));
+        entity.setSkillTier(firstNonBlank(attributes.getSkillTier(), entity.getSkillTier(), "BRONCE"));
+        entity.setAgeRange(firstNonBlank(attributes.getAgeRange(), entity.getAgeRange(), "18_25"));
+
+        if (attributes.getGoalkeeper() != null) {
+            entity.setGoalkeeper(attributes.getGoalkeeper());
+        } else {
+            entity.setGoalkeeper("PORTERO".equalsIgnoreCase(posicion));
+        }
+
+        if ("G".equalsIgnoreCase(entity.getPlayStyle())) {
+            entity.setGoalkeeper(true);
+            if (attributes.getPosicionPreferida() == null || attributes.getPosicionPreferida().isBlank()) {
+                entity.setPosicionPreferida("PORTERO");
+            }
+        }
+
+        if (attributes.getPiernaBuena() != null) {
+            String pierna = attributes.getPiernaBuena().trim();
+            entity.setPiernaBuena(pierna.isEmpty() ? null : pierna);
+        }
+
+        if (attributes.getDisponibilidad() != null) {
+            if (attributes.getDisponibilidad().isEmpty()) {
+                entity.setDisponibilidad(null);
+            } else {
+                entity.setDisponibilidad(String.join(",", attributes.getDisponibilidad()));
+            }
+        }
+
+        entity.setPlayTendency(calculatePlayTendency(entity.getPlayStyle()));
+        entity.setGlobalRating(calculateGlobalRating(entity));
     }
 
     private PlayerProfileResponseDTO toResponse(PlayerProfileEntity profile) {
@@ -156,28 +176,27 @@ public class PlayerProfileService {
         return response;
     }
 
-    private Float calculateGlobalRating(PlayerProfileRequestDTO.AttributesDTO attributes) {
-        List<Integer> skills = new ArrayList<>();
-        skills.add(attributes.getShooting());
-        skills.add(attributes.getSpeed());
-        skills.add(attributes.getDribbling());
-        skills.add(attributes.getDefense());
-        skills.add(attributes.getStrength());
-        skills.add(attributes.getStamina());
-        skills.add(attributes.getAerial());
+    private Float calculateGlobalRating(PlayerProfileEntity profile) {
+        int shooting = normalizeSkill(profile.getShooting(), 3);
+        int speed = normalizeSkill(profile.getSpeed(), 3);
+        int dribbling = normalizeSkill(profile.getDribbling(), 3);
+        int defense = normalizeSkill(profile.getDefense(), 3);
+        int strength = normalizeSkill(profile.getStrength(), 3);
+        int stamina = normalizeSkill(profile.getStamina(), 3);
+        int aerial = normalizeSkill(profile.getAerial(), 3);
 
-        // Calcular promedio base (0-5)
-        int sum = skills.stream().mapToInt(Integer::intValue).sum();
+        int sum = shooting + speed + dribbling + defense + strength + stamina + aerial;
         float baseRating = (float) sum / 7;
         
         // Añadir modificador según skillTier
         float tierModifier = 0;
-        if (attributes.getSkillTier() != null) {
-            switch (attributes.getSkillTier()) {
+        if (profile.getSkillTier() != null) {
+            switch (profile.getSkillTier()) {
                 case "BRONCE": tierModifier = -1; break;
                 case "PLATA": tierModifier = 1; break;
                 case "ORO": tierModifier = 3; break;
                 case "DIAMANTE": tierModifier = 5; break;
+                default: tierModifier = 0; break;
             }
         }
         
@@ -185,23 +204,46 @@ public class PlayerProfileService {
         float finalRating = baseRating + tierModifier;
         return Math.round(finalRating * 10) / 10f;
     }
-    
-    private String calculatePlayTendency(PlayerProfileRequestDTO.AttributesDTO attributes) {
-        // Calcular puntuación ofensiva (shooting, speed, dribbling)
-        int offensive = attributes.getShooting() + attributes.getSpeed() + attributes.getDribbling();
-        
-        // Calcular puntuación defensiva (defense, strength, aerial)
-        int defensive = attributes.getDefense() + attributes.getStrength() + attributes.getAerial();
-        
-        // Diferencia para determinar tendencia
-        int diff = Math.abs(offensive - defensive);
-        
-        // Si la diferencia es menor a 3, es adaptable
-        if (diff < 3) {
-            return "ADAPTABLE";
+
+    private String calculatePlayTendency(String playStyle) {
+        if ("G".equalsIgnoreCase(playStyle)) {
+            return "PORTERO";
         }
-        
-        // Si es mayor, determinar si es ofensiva o defensiva
-        return offensive > defensive ? "OFENSIVA" : "DEFENSIVA";
+        if ("O".equalsIgnoreCase(playStyle)) {
+            return "OFENSIVA";
+        }
+        if ("D".equalsIgnoreCase(playStyle)) {
+            return "DEFENSIVA";
+        }
+        return "ADAPTABLE";
+    }
+
+    private int normalizeSkill(Integer value, Integer fallback) {
+        int source = value != null ? value : (fallback != null ? fallback : 3);
+        if (source < 0) {
+            return 0;
+        }
+        if (source > 5) {
+            return 5;
+        }
+        return source;
+    }
+
+    private String normalizePlayStyle(String value, String fallback) {
+        String raw = firstNonBlank(value, fallback, "A").toUpperCase();
+        return switch (raw) {
+            case "O", "D", "A", "G" -> raw;
+            default -> "A";
+        };
+    }
+
+    private String firstNonBlank(String first, String second, String defaultValue) {
+        if (first != null && !first.isBlank()) {
+            return first.trim();
+        }
+        if (second != null && !second.isBlank()) {
+            return second.trim();
+        }
+        return defaultValue;
     }
 }

@@ -21,6 +21,7 @@ public class PartidoResponseDTO {
     private String lugar;
     private Integer jugadoresPorEquipo;
     private String tipo;
+    private String modoEquipos;
     private String estado;
     private Integer equipoACount;
     private Integer equipoBCount;

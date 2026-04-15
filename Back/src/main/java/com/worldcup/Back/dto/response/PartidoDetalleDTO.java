@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,6 +22,7 @@ public class PartidoDetalleDTO {
     private String lugar;
     private Integer jugadoresPorEquipo;
     private String tipo;
+    private String modoEquipos;
     private String estado;
     private List<UsuarioResumenDTO> jugadoresInscritos;
     private List<UsuarioResumenDTO> equipoA;
@@ -30,6 +32,11 @@ public class PartidoDetalleDTO {
     private Boolean estaInscrito;
     private String colorEquipoA;
     private String colorEquipoB;
+    private Boolean ratingProcesado;
+    private String estadoCalidad;
+    private BigDecimal scoreCalidad;
+    private BigDecimal participacionVotacion;
+    private LocalDateTime ratingProcesadoEn;
     private LocalDateTime creadoEn;
     private LocalDateTime actualizadoEn;
 }

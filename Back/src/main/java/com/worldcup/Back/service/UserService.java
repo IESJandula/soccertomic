@@ -7,6 +7,7 @@ import com.worldcup.Back.dto.response.UsuarioResumenDTO;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.repository.UsuarioRepository;
+import com.worldcup.Back.service.level.VisibleLevelService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,9 @@ public class UserService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private VisibleLevelService visibleLevelService;
 
     public List<UsuarioEntity> listarUsuarios(){
         return usuarioRepository.findAll();
@@ -48,6 +52,11 @@ public class UserService {
             usuario.setNombre(request.getNombre());
         } else if (usuario.getNombre() == null || usuario.getNombre().isBlank()) {
             usuario.setNombre(emailToken != null ? emailToken : firebaseUid);
+        }
+
+        if (request != null && request.getBio() != null) {
+            String bio = request.getBio().trim();
+            usuario.setBio(bio.isEmpty() ? null : bio);
         }
 
         if (usuario.getRasgos() == null) {
@@ -84,11 +93,9 @@ public class UserService {
     }
 
     public UsuarioResumenDTO entityToResumenDTO(UsuarioEntity usuario) {
-        String skillTier = null;
         String playTendency = null;
         
         if (usuario.getPlayerProfile() != null) {
-            skillTier = usuario.getPlayerProfile().getSkillTier();
             playTendency = usuario.getPlayerProfile().getPlayTendency();
         }
         
@@ -96,11 +103,13 @@ public class UserService {
                 usuario.getId(),
                 usuario.getNombre(),
                 usuario.getEmail(),
+            usuario.getBio(),
                 usuario.getNivel(),
                 usuario.getReputacionPositiva(),
                 usuario.getRasgos(),
-                skillTier,
-                playTendency
+            playTendency,
+            visibleLevelService.calcularNivelVisible(usuario),
+            visibleLevelService.calcularFiabilidadLabel(usuario)
         );
     }
 
@@ -110,8 +119,11 @@ public class UserService {
             .map(usuario -> new UsuarioPublicoDTO(
                 usuario.getId(),
                 usuario.getNombre(),
+                usuario.getBio(),
                 usuario.getPuntos(),
-                usuario.getRasgos()
+                usuario.getRasgos(),
+                visibleLevelService.calcularNivelVisible(usuario),
+                visibleLevelService.calcularFiabilidadLabel(usuario)
             ))
             .collect(Collectors.toList());
         }

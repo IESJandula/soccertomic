@@ -1,6 +1,6 @@
 <template>
   <div v-if="partida" class="space-y-4">
-    <section v-if="feedbackMessage" class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-3 text-sm font-medium">
+    <section v-if="feedbackMessage" class="bg-[color:var(--color-primary)] border border-[color:rgba(2,4,11,0.35)] text-slate-900 rounded-lg p-3 text-sm font-semibold shadow-[0_8px_18px_rgba(151,240,125,0.26)]">
       {{ feedbackMessage }}
     </section>
 
@@ -59,8 +59,8 @@
                 <span>{{ getRolShortLabel(jugador) }}</span>
               </span>
             </p>
-            <p class="text-[11px] text-slate-600" v-if="jugador.skillTier || jugador.playTendency">
-              {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+            <p class="text-[11px] text-slate-600" v-if="jugador.playTendency">
+              Tendencia: {{ formatTendencia(jugador.playTendency) }}
             </p>
           </div>
         </div>
@@ -117,8 +117,8 @@
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p class="text-[11px] text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
-                {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+              <p class="text-[11px] text-slate-300" v-if="jugador.playTendency">
+                Tendencia: {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
           </div>
@@ -173,8 +173,8 @@
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p class="text-[11px] text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
-                {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+              <p class="text-[11px] text-slate-300" v-if="jugador.playTendency">
+                Tendencia: {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
           </div>
@@ -350,17 +350,6 @@ const estadoActualUsuario = computed(() => {
     descriptionClass: 'text-slate-700',
   }
 })
-
-const formatNivel = (skillTier) => {
-  if (!skillTier) return ''
-  const niveles = {
-    'BRONCE': 'Bronce',
-    'PLATA': 'Plata',
-    'ORO': 'Oro',
-    'DIAMANTE': 'Diamante'
-  }
-  return niveles[skillTier] || skillTier
-}
 
 const formatTendencia = (playTendency) => {
   if (!playTendency) return ''

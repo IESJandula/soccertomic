@@ -35,6 +35,10 @@ const cargandoVotacion = ref(false)
 const guardandoVotacion = ref(false)
 const miVoto = ref(null)
 const resumenVotacion = ref(null)
+const procesandoRating = ref(false)
+const resultadoProcesoRating = ref(null)
+const mensajeProcesoRating = ref('')
+const ultimaEjecucionRating = ref(null)
 const companerosAsignados = ref([])
 const mensajeVotacion = ref('')
 const enviandoSolicitudA = ref(null)
@@ -46,6 +50,7 @@ const votacionForm = ref({
   golesEquipoBPropuesto: 0,
   intensidadPartido: 'MEDIO',
   partidoFueParejo: true,
+  partidoAlterado: false,
   jugadoresDiferenciales: [],
   valoracionesCompaneros: [],
 })
@@ -477,6 +482,7 @@ const cargarPanelVotacion = async (partidoId) => {
           golesEquipoBPropuesto: voto.golesEquipoBPropuesto,
           intensidadPartido: voto.intensidadPartido || 'MEDIO',
           partidoFueParejo: Boolean(voto.partidoFueParejo),
+          partidoAlterado: Boolean(voto.partidoAlterado),
           jugadoresDiferenciales: (voto.jugadoresDiferenciales || []).filter((id) => !esUsuarioActual(id)),
           valoracionesCompaneros: (voto.valoracionesCompaneros || []).map(v => ({ jugadorId: v.jugadorId, puntuacion: v.puntuacion })),
         }
@@ -511,6 +517,7 @@ const guardarVotacion = async () => {
       golesEquipoBPropuesto: Number(votacionForm.value.golesEquipoBPropuesto),
       intensidadPartido: votacionForm.value.intensidadPartido,
       partidoFueParejo: Boolean(votacionForm.value.partidoFueParejo),
+      partidoAlterado: Boolean(votacionForm.value.partidoAlterado),
       jugadoresDiferenciales: (votacionForm.value.jugadoresDiferenciales || []).filter((id) => !esUsuarioActual(id)),
       valoracionesCompaneros: votacionForm.value.valoracionesCompaneros,
     }
@@ -629,6 +636,105 @@ const diferencialesRestantes = computed(() => {
     : 0
   return Math.max(0, total - diferencialesResumen.value.length)
 })
+
+const participacionVotacionTexto = computed(() => {
+  const raw = Number(partido.value?.participacionVotacion)
+  if (!Number.isFinite(raw)) return '0%'
+  return `${Math.round(raw * 100)}%`
+})
+
+const scoreCalidadTexto = computed(() => {
+  const raw = Number(partido.value?.scoreCalidad)
+  if (!Number.isFinite(raw)) return '0.000'
+  return raw.toFixed(3)
+})
+
+const claseEstadoCalidad = computed(() => {
+  const estado = partido.value?.estadoCalidad || 'NORMAL'
+  if (estado === 'ALTERADO') {
+    return 'bg-rose-600 text-white border-rose-600'
+  }
+  if (estado === 'SEMI_ALTERADO') {
+    return 'bg-amber-500 text-slate-900 border-amber-500'
+  }
+  return 'bg-emerald-600 text-white border-emerald-600'
+})
+
+const resultadoResolucionTexto = computed(() => {
+  const resultado = resultadoProcesoRating.value?.resultadoResolucion
+  if (!resultado) {
+    return partido.value?.ratingProcesado ? 'PROCESADO' : 'SIN_EJECUCION'
+  }
+  return resultado
+})
+
+const claseResultadoResolucion = computed(() => {
+  const resultado = resultadoResolucionTexto.value
+  if (resultado === 'GANA_A' || resultado === 'GANA_B') {
+    return 'bg-emerald-600 text-white border-emerald-600'
+  }
+  if (resultado === 'EMPATE') {
+    return 'bg-amber-500 text-slate-900 border-amber-500'
+  }
+  if (resultado === 'YA_PROCESADO' || resultado === 'PROCESADO') {
+    return 'bg-sky-600 text-white border-sky-600'
+  }
+  if (resultado === 'SIN_DATOS' || resultado === 'SIN_EQUIPOS' || resultado === 'SIN_EJECUCION') {
+    return 'bg-slate-500 text-white border-slate-500'
+  }
+  return 'bg-rose-600 text-white border-rose-600'
+})
+
+const fechaProcesadoTexto = computed(() => {
+  const fecha = partido.value?.ratingProcesadoEn
+  return fecha ? formatearFecha(fecha) : 'Pendiente'
+})
+
+const fechaUltimaEjecucionTexto = computed(() => {
+  const fecha = ultimaEjecucionRating.value?.fecha
+  if (!fecha) {
+    return resultadoProcesoRating.value?.procesadoEn
+      ? formatearFecha(resultadoProcesoRating.value.procesadoEn)
+      : 'Sin ejecuciones en esta sesión'
+  }
+  return formatearFecha(fecha)
+})
+
+const procesarRatingPartido = async () => {
+  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO') return
+
+  procesandoRating.value = true
+  mensajeProcesoRating.value = ''
+
+  try {
+    const response = await partidoService.procesarRatingPartido(partido.value.id)
+    resultadoProcesoRating.value = response
+    mensajeProcesoRating.value = response?.mensaje || 'Proceso de rating ejecutado.'
+    ultimaEjecucionRating.value = {
+      fecha: new Date().toISOString(),
+      resultado: response?.resultadoResolucion || 'SIN_RESULTADO',
+      mensaje: mensajeProcesoRating.value,
+    }
+
+    if (response?.procesado) {
+      uiStore.showToast({ message: mensajeProcesoRating.value, type: 'success' })
+    } else {
+      uiStore.showToast({ message: mensajeProcesoRating.value, type: 'info' })
+    }
+
+    await recargarPartido()
+  } catch (err) {
+    mensajeProcesoRating.value = err?.message || 'No se pudo procesar el rating del partido'
+    ultimaEjecucionRating.value = {
+      fecha: new Date().toISOString(),
+      resultado: 'ERROR',
+      mensaje: mensajeProcesoRating.value,
+    }
+    uiStore.showToast({ message: mensajeProcesoRating.value, type: 'error' })
+  } finally {
+    procesandoRating.value = false
+  }
+}
 
 const handleGoBack = () => {
   router.back()
@@ -757,6 +863,66 @@ const handleGoBack = () => {
         <h3 class="text-xl font-bold text-slate-800 mb-2">Panel de votación</h3>
         <p class="text-sm text-slate-600 mb-4">Al finalizar, registra tu evaluación rápida y envía tu voto.</p>
 
+        <div v-if="esOrganizador()" class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-700">Estado de calidad</span>
+              <span :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold', claseEstadoCalidad]">
+                {{ partido.estadoCalidad || 'NORMAL' }}
+              </span>
+              <span :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold', claseResultadoResolucion]">
+                {{ resultadoResolucionTexto }}
+              </span>
+            </div>
+
+            <BaseButton
+              size="sm"
+              :loading="procesandoRating"
+              :disabled="procesandoRating || partido.ratingProcesado === true"
+              @click="procesarRatingPartido"
+            >
+              {{ partido.ratingProcesado ? 'Rating ya procesado' : 'Procesar rating oficial' }}
+            </BaseButton>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div class="rounded-lg border border-slate-200 bg-white p-2">
+              <p class="text-slate-500">Score calidad</p>
+              <p class="font-bold text-slate-800">{{ scoreCalidadTexto }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-2">
+              <p class="text-slate-500">Participación votos</p>
+              <p class="font-bold text-slate-800">{{ participacionVotacionTexto }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-2">
+              <p class="text-slate-500">Votos considerados</p>
+              <p class="font-bold text-slate-800">{{ resultadoProcesoRating?.votosConsiderados ?? 0 }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-2">
+              <p class="text-slate-500">Votos atípicos</p>
+              <p class="font-bold text-slate-800">{{ resultadoProcesoRating?.votosAtipicos ?? 0 }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-2.5 text-xs space-y-1">
+            <p class="font-semibold text-slate-800">Bitácora de rating</p>
+            <p class="text-slate-600">
+              <span class="font-medium text-slate-700">Procesado oficialmente:</span>
+              {{ fechaProcesadoTexto }}
+            </p>
+            <p class="text-slate-600">
+              <span class="font-medium text-slate-700">Última ejecución:</span>
+              {{ fechaUltimaEjecucionTexto }}
+            </p>
+            <p v-if="ultimaEjecucionRating?.mensaje" class="text-slate-600">
+              <span class="font-medium text-slate-700">Detalle:</span>
+              {{ ultimaEjecucionRating.mensaje }}
+            </p>
+          </div>
+
+          <p v-if="mensajeProcesoRating" class="text-xs font-medium text-slate-700">{{ mensajeProcesoRating }}</p>
+        </div>
+
         <div v-if="cargandoVotacion" class="text-slate-600 text-sm">Cargando votaciones...</div>
 
         <div v-else class="space-y-3">
@@ -794,6 +960,32 @@ const handleGoBack = () => {
                   No
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">¿Partido alterado por incidencias?</label>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="votacionForm.partidoAlterado = false"
+                :class="[
+                  'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                  !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
+                ]"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                @click="votacionForm.partidoAlterado = true"
+                :class="[
+                  'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                  votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
+                ]"
+              >
+                Sí
+              </button>
             </div>
           </div>
 

@@ -10,6 +10,7 @@ import com.worldcup.Back.entity.enums.EstadoPartido;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +45,27 @@ public class PartidoEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EstadoPartido estado = EstadoPartido.BORRADOR;
+
+    @Column(nullable = false, length = 16)
+    private String modoEquipos = "MANUAL";
+
+    @Column(nullable = false, length = 20)
+    private String estadoCalidad = "NORMAL";
+
+    @Column(nullable = false, precision = 4, scale = 3)
+    private BigDecimal scoreCalidad = new BigDecimal("1.000");
+
+    @Column(nullable = false)
+    private Boolean ratingProcesado = false;
+
+    @Column
+    private LocalDateTime ratingProcesadoEn;
+
+    @Column(length = 20)
+    private String ratingSnapshotVersion;
+
+    @Column(nullable = false, precision = 4, scale = 3)
+    private BigDecimal participacionVotacion = new BigDecimal("0.000");
 
     @OneToMany(mappedBy = "partido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<PartidoOrganizadorEntity> organizadores = new ArrayList<>();
@@ -129,17 +151,37 @@ public class PartidoEntity {
             organizadores = new ArrayList<>();
         }
         normalizeEstado();
+        normalizeCamposNuevos();
     }
 
     @PrePersist
     @PreUpdate
     private void normalizeBeforeSave() {
         normalizeEstado();
+        normalizeCamposNuevos();
     }
 
     private void normalizeEstado() {
         if (estado != null) {
             estado = estado.canonical();
+        }
+    }
+
+    private void normalizeCamposNuevos() {
+        if (modoEquipos == null || modoEquipos.isBlank()) {
+            modoEquipos = "MANUAL";
+        }
+        if (estadoCalidad == null || estadoCalidad.isBlank()) {
+            estadoCalidad = "NORMAL";
+        }
+        if (scoreCalidad == null) {
+            scoreCalidad = new BigDecimal("1.000");
+        }
+        if (ratingProcesado == null) {
+            ratingProcesado = false;
+        }
+        if (participacionVotacion == null) {
+            participacionVotacion = new BigDecimal("0.000");
         }
     }
 

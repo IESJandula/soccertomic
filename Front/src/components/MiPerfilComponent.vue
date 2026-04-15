@@ -1,15 +1,12 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { usePlayerProfileStore } from '../stores/playerProfile'
 import apiService from '../services/apiService'
 import { formatDateTimeEs } from '../utils/dateFormat'
 import playerProfileService from '../services/playerProfileService'
 import partidoService from '../services/partidoService'
-import TierIcon from './ui/TierIcon.vue'
 
 const authStore = useAuthStore()
-const profileStore = usePlayerProfileStore()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -36,46 +33,13 @@ const resumenVotacion = ref({
 
 const form = ref({
   nombre: '',
-  piernaBuena: '',
-  disponibilidad: [],
-  ageRange: '18_25',
-})
-
-const futbolistaForm = ref({
-  goalkeeper: false,
-  shooting: 3,
-  speed: 3,
-  dribbling: 3,
-  defense: 3,
-  strength: 3,
-  stamina: 3,
-  aerial: 3,
-  playStyle: 'A',
-  skillTier: 'BRONCE',
+  bio: '',
 })
 
 const preferenciasFutbolista = ref({
   playStyle: 'A',
   posicionPreferida: 'MEDIOCAMPISTA',
 })
-
-const normalizarPiernaDesdeBack = (valor) => {
-  if (!valor) return ''
-  const v = String(valor).trim().toUpperCase()
-  if (v === 'RIGHT' || v === 'DERECHA') return 'Derecha'
-  if (v === 'LEFT' || v === 'IZQUIERDA') return 'Izquierda'
-  if (v === 'BOTH' || v === 'AMBIDIESTRA' || v === 'AMBAS') return 'Ambidiestra'
-  return ''
-}
-
-const normalizarPiernaParaBack = (valor) => {
-  if (!valor) return null
-  const v = String(valor).trim().toUpperCase()
-  if (v === 'RIGHT' || v === 'DERECHA') return 'Derecha'
-  if (v === 'LEFT' || v === 'IZQUIERDA') return 'Izquierda'
-  if (v === 'BOTH' || v === 'AMBIDIESTRA' || v === 'AMBAS') return 'Ambidiestra'
-  return null
-}
 
 const cargarDatos = async () => {
   loading.value = true
@@ -106,21 +70,7 @@ const cargarDatos = async () => {
     })
     resumenVotacion.value = votacionResumenData || { vecesDiferencial: 0, valoracionesPositivas: 0, valoracionesNegativas: 0 }
     form.value.nombre = resumenData?.nombre || ''
-    form.value.piernaBuena = normalizarPiernaDesdeBack(profileData?.attributes?.piernaBuena)
-    form.value.disponibilidad = Array.isArray(profileData?.attributes?.disponibilidad) ? profileData.attributes.disponibilidad : []
-    form.value.ageRange = profileData?.attributes?.ageRange || '18_25'
-    futbolistaForm.value = {
-      goalkeeper: profileData?.attributes?.goalkeeper ?? false,
-      shooting: profileData?.attributes?.shooting ?? 3,
-      speed: profileData?.attributes?.speed ?? 3,
-      dribbling: profileData?.attributes?.dribbling ?? 3,
-      defense: profileData?.attributes?.defense ?? 3,
-      strength: profileData?.attributes?.strength ?? 3,
-      stamina: profileData?.attributes?.stamina ?? 3,
-      aerial: profileData?.attributes?.aerial ?? 3,
-      playStyle: profileData?.attributes?.playStyle || 'A',
-      skillTier: profileData?.attributes?.skillTier || 'BRONCE',
-    }
+    form.value.bio = resumenData?.bio || ''
     preferenciasFutbolista.value = {
       playStyle: profileData?.attributes?.playStyle || 'A',
       posicionPreferida: profileData?.attributes?.posicionPreferida || (profileData?.attributes?.goalkeeper ? 'PORTERO' : 'MEDIOCAMPISTA'),
@@ -146,26 +96,7 @@ const guardarInformacionBasica = async () => {
   ok.value = ''
 
   try {
-    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email)
-    const attrs = playerProfile.value?.attributes || {}
-    await playerProfileService.guardarMiPerfil({
-      attributes: {
-        goalkeeper: attrs.goalkeeper ?? futbolistaForm.value.goalkeeper ?? false,
-        shooting: attrs.shooting ?? futbolistaForm.value.shooting ?? 3,
-        speed: attrs.speed ?? futbolistaForm.value.speed ?? 3,
-        dribbling: attrs.dribbling ?? futbolistaForm.value.dribbling ?? 3,
-        defense: attrs.defense ?? futbolistaForm.value.defense ?? 3,
-        strength: attrs.strength ?? futbolistaForm.value.strength ?? 3,
-        stamina: attrs.stamina ?? futbolistaForm.value.stamina ?? 3,
-        aerial: attrs.aerial ?? futbolistaForm.value.aerial ?? 3,
-        playStyle: attrs.playStyle || futbolistaForm.value.playStyle || 'A',
-        skillTier: attrs.skillTier || futbolistaForm.value.skillTier || 'BRONCE',
-        ageRange: form.value.ageRange || '18_25',
-        posicionPreferida: attrs.posicionPreferida || (attrs.goalkeeper ? 'PORTERO' : 'MEDIOCAMPISTA'),
-        piernaBuena: normalizarPiernaParaBack(form.value.piernaBuena),
-        disponibilidad: Array.isArray(form.value.disponibilidad) ? form.value.disponibilidad : [],
-      },
-    })
+    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email, form.value.bio || '')
     await authStore.refreshUsuario()
     await cargarDatos()
     ok.value = 'Información básica actualizada correctamente'
@@ -192,24 +123,12 @@ const guardarPerfilFutbolista = async () => {
   saving.value = true
   error.value = ''
   ok.value = ''
-  const attrs = playerProfile.value?.attributes || {}
   try {
     await playerProfileService.guardarMiPerfil({
       attributes: {
-        goalkeeper: preferenciasFutbolista.value.posicionPreferida === 'PORTERO',
-        shooting: Number(attrs.shooting ?? futbolistaForm.value.shooting ?? 3),
-        speed: Number(attrs.speed ?? futbolistaForm.value.speed ?? 3),
-        dribbling: Number(attrs.dribbling ?? futbolistaForm.value.dribbling ?? 3),
-        defense: Number(attrs.defense ?? futbolistaForm.value.defense ?? 3),
-        strength: Number(attrs.strength ?? futbolistaForm.value.strength ?? 3),
-        stamina: Number(attrs.stamina ?? futbolistaForm.value.stamina ?? 3),
-        aerial: Number(attrs.aerial ?? futbolistaForm.value.aerial ?? 3),
+        goalkeeper: preferenciasFutbolista.value.posicionPreferida === 'PORTERO' || preferenciasFutbolista.value.playStyle === 'G',
         playStyle: preferenciasFutbolista.value.playStyle || 'A',
-        skillTier: attrs.skillTier || futbolistaForm.value.skillTier || 'BRONCE',
-        ageRange: form.value.ageRange || '18_25',
         posicionPreferida: preferenciasFutbolista.value.posicionPreferida || 'MEDIOCAMPISTA',
-        piernaBuena: normalizarPiernaParaBack(form.value.piernaBuena),
-        disponibilidad: Array.isArray(form.value.disponibilidad) ? form.value.disponibilidad : [],
       },
     })
     await cargarDatos()
@@ -223,9 +142,8 @@ const guardarPerfilFutbolista = async () => {
 
 const resumenInfoBasica = computed(() => {
   const partes = []
-  if (form.value.piernaBuena) partes.push('pierna configurada')
-  if (Array.isArray(form.value.disponibilidad) && form.value.disponibilidad.length > 0) partes.push('disponibilidad configurada')
-  if (form.value.ageRange) partes.push('rango de edad configurado')
+  if ((form.value.nombre || '').trim()) partes.push('nombre configurado')
+  if ((form.value.bio || '').trim()) partes.push('bio configurada')
   return partes.length ? partes.join(' · ') : 'Completa tus datos básicos'
 })
 
@@ -235,13 +153,12 @@ const resumenEstadisticas = computed(() => {
 
 const resumenPerfilFutbolista = computed(() => {
   if (!playerProfile.value?.attributes && !editandoFutbolista.value) return 'Configura tu perfil futbolista'
-  const tier = skillTierLabel.value?.label || 'Sin nivel'
-  const tendencia = playTendencyLabel.value?.label || 'Sin tendencia'
-  return `${tier} · ${tendencia}`
+  return `${tendenciaPreferidaLabel.value} · ${posicionPreferidaLabel.value}`
 })
 
 const tendenciaPreferidaLabel = computed(() => {
   const estilo = preferenciasFutbolista.value.playStyle || playerProfile.value?.attributes?.playStyle || 'A'
+  if (estilo === 'G') return 'Portero'
   if (estilo === 'O') return 'Ofensiva'
   if (estilo === 'D') return 'Defensiva'
   return 'Adaptable'
@@ -254,20 +171,6 @@ const posicionPreferidaLabel = computed(() => {
   if (posicion === 'DELANTERO') return 'Delantero'
   return 'Mediocampista'
 })
-
-const categoriaAtributo = (valor) => {
-  const v = Number(valor)
-  if (!Number.isFinite(v)) return 'Nulo'
-  const labels = {
-    0: 'Nulo',
-    1: 'Muy bajo',
-    2: 'Bajo',
-    3: 'Medio',
-    4: 'Alto',
-    5: 'Muy alto',
-  }
-  return labels[Math.round(v)] || 'Nulo'
-}
 
 const formatearFecha = (fecha) => {
   return formatDateTimeEs(fecha)
@@ -496,40 +399,45 @@ const nivelSocialExperiencia = computed(() => {
   return 'Inicial'
 })
 
-const skillTierLabel = computed(() => {
-  const tierValue = futbolistaForm.value.skillTier || playerProfile.value?.attributes?.skillTier || 'BRONCE'
-  const tier = profileStore.skillTierOptions.find(t => t.value === tierValue)
-  return tier ? { label: tier.label, value: tier.value } : { label: 'Bronce', value: 'BRONCE' }
+const nivelVisibleTexto = computed(() => {
+  const raw = Number(resumen.value?.nivelVisible)
+  if (!Number.isFinite(raw)) return '0.00'
+  return raw.toFixed(2)
 })
 
-const playTendencyLabel = computed(() => {
-  const attrs = {
-    shooting: Number(futbolistaForm.value.shooting ?? playerProfile.value?.attributes?.shooting ?? 3),
-    speed: Number(futbolistaForm.value.speed ?? playerProfile.value?.attributes?.speed ?? 3),
-    dribbling: Number(futbolistaForm.value.dribbling ?? playerProfile.value?.attributes?.dribbling ?? 3),
-    defense: Number(futbolistaForm.value.defense ?? playerProfile.value?.attributes?.defense ?? 3),
-    strength: Number(futbolistaForm.value.strength ?? playerProfile.value?.attributes?.strength ?? 3),
-    aerial: Number(futbolistaForm.value.aerial ?? playerProfile.value?.attributes?.aerial ?? 3),
-  }
-
-  const offensive = (attrs.shooting || 0) + (attrs.speed || 0) + (attrs.dribbling || 0)
-  const defensive = (attrs.defense || 0) + (attrs.strength || 0) + (attrs.aerial || 0)
-  const diff = Math.abs(offensive - defensive)
-  
-  if (diff < 3) return { label: 'Adaptable' }
-  return offensive > defensive ? { label: 'Ofensiva' } : { label: 'Defensiva' }
+const nivelVisibleRaw = computed(() => {
+  const raw = Number(resumen.value?.nivelVisible)
+  if (!Number.isFinite(raw)) return 0
+  return Math.max(0, raw)
 })
 
-const ageRangeLabel = computed(() => {
-  const value = form.value.ageRange || playerProfile.value?.attributes?.ageRange
-  if (!value) return 'No especificado'
-  const found = profileStore.ageRangeOptions.find(option => option.value === value)
-  return found ? found.label : 'No especificado'
+const nivelBase = computed(() => Math.floor(nivelVisibleRaw.value))
+const siguienteNivel = computed(() => nivelBase.value + 1)
+const nivelProgresoPct = computed(() => {
+  const fraccion = nivelVisibleRaw.value - nivelBase.value
+  const pct = Math.round(fraccion * 100)
+  return Math.max(0, Math.min(100, pct))
 })
 
-const globalRating = computed(() => {
-  if (!playerProfile.value?.attributes?.globalRating) return '0'
-  return playerProfile.value.attributes.globalRating
+const puntosParaSiguienteNivel = computed(() => {
+  const diff = siguienteNivel.value - nivelVisibleRaw.value
+  return Math.max(0, diff).toFixed(2)
+})
+
+const fiabilidadLabelTexto = computed(() => {
+  return resumen.value?.fiabilidadLabel || 'MEDIA'
+})
+
+const confianzaNivelTexto = computed(() => {
+  if (fiabilidadLabelTexto.value === 'ALTA') return 'Muy estable'
+  if (fiabilidadLabelTexto.value === 'BAJA') return 'En ajuste'
+  return 'Estable'
+})
+
+const fiabilidadLabelClase = computed(() => {
+  if (fiabilidadLabelTexto.value === 'ALTA') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+  if (fiabilidadLabelTexto.value === 'BAJA') return 'bg-rose-100 text-rose-800 border-rose-200'
+  return 'bg-amber-100 text-amber-800 border-amber-200'
 })
 </script>
 
@@ -554,45 +462,68 @@ const globalRating = computed(() => {
         </button>
         <transition name="accordion">
         <div v-if="expandedSections.basic" class="px-4 pb-4 space-y-3 border-t border-slate-100 overflow-hidden">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-slate-600 font-semibold">Nivel actual</p>
+                <span class="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+                  Nivel {{ nivelBase }}
+                </span>
+              </div>
+              <p class="text-2xl font-bold text-slate-900 mt-1">{{ nivelVisibleTexto }}</p>
+              <div class="mt-2">
+                <div class="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div class="h-full rounded-full bg-lime-500 transition-all duration-500" :style="{ width: `${nivelProgresoPct}%` }"></div>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Nivel {{ nivelBase }}</span>
+                  <span>{{ nivelProgresoPct }}%</span>
+                  <span>Nivel {{ siguienteNivel }}</span>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-2">
+                Te faltan {{ puntosParaSiguienteNivel }} puntos para subir al nivel {{ siguienteNivel }}.
+              </p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p class="text-xs text-slate-600 font-semibold">Confianza del nivel</p>
+              <span :class="['inline-flex mt-1 items-center rounded-full border px-2.5 py-1 text-xs font-semibold', fiabilidadLabelClase]">
+                {{ confianzaNivelTexto }}
+              </span>
+              <p class="text-[11px] text-slate-500 mt-1">Tu nivel será más preciso cuando tengas más actividad.</p>
+              <p class="text-[11px] text-slate-600 mt-2 font-semibold">Cómo mejorarla:</p>
+              <ul class="text-[11px] text-slate-500 mt-1 space-y-0.5 list-disc pl-4">
+                <li>Juega partidos completos con regularidad.</li>
+                <li>Vota al final de cada partido.</li>
+                <li>Evita ausencias y abandonos.</li>
+              </ul>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-3">
+              <p class="text-xs text-slate-600 font-semibold">Preferencia de juego</p>
+              <p class="text-base font-bold text-slate-900">{{ tendenciaPreferidaLabel }} · {{ posicionPreferidaLabel }}</p>
+              <p class="text-[11px] text-slate-500 mt-1">Nos ayuda a armar equipos más equilibrados</p>
+            </div>
+          </div>
+
+          <p class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+            Este bloque te resume de forma rápida cómo va tu progresión en la app.
+          </p>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-gray-700 mb-1">Nombre</label>
               <input v-model="form.nombre" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-gray-700 mb-1">Pierna buena</label>
-              <select v-model="form.piernaBuena" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-                <option value="">Seleccionar</option>
-                <option value="Derecha">Derecha</option>
-                <option value="Izquierda">Izquierda</option>
-                <option value="Ambidiestra">Ambidiestra</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-gray-700 mb-1">Rango de edad</label>
-              <select v-model="form.ageRange" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-                <option v-for="option in profileStore.ageRangeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Disponibilidad</label>
-            <div class="flex flex-wrap gap-1.5">
-              <button
-                v-for="option in profileStore.disponibilidadOpciones"
-                :key="option"
-                type="button"
-                @click="form.disponibilidad = form.disponibilidad.includes(option) ? form.disponibilidad.filter(v => v !== option) : [...form.disponibilidad, option]"
-                :class="[
-                  'px-2 py-1 rounded-full border text-[11px] font-medium transition',
-                  form.disponibilidad.includes(option)
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-slate-700 border-slate-300'
-                ]"
-              >
-                {{ option }}
-              </button>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Bio (opcional)</label>
+              <textarea
+                v-model="form.bio"
+                maxlength="400"
+                rows="3"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Cuéntanos brevemente cómo juegas"
+              />
+              <p class="text-[11px] text-slate-500 mt-1">{{ (form.bio || '').length }}/400</p>
             </div>
           </div>
 
@@ -797,15 +728,7 @@ const globalRating = computed(() => {
         </div>
 
         <div v-else class="space-y-3">
-          <!-- Nivel y Tendencia -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div class="bg-white border-2 border-amber-300 rounded-xl p-4 text-center shadow-sm">
-              <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Nivel</p>
-              <div class="flex items-center justify-center gap-1.5 text-2xl md:text-3xl font-bold text-slate-900">
-                <TierIcon :tier="skillTierLabel.value" :size="24" />
-                <span>{{ skillTierLabel.label }}</span>
-              </div>
-            </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div class="bg-white border-2 border-blue-300 rounded-xl p-4 text-center shadow-sm">
               <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Tendencia</p>
               <p class="text-2xl md:text-3xl font-bold text-slate-900">
@@ -848,72 +771,8 @@ const globalRating = computed(() => {
             </div>
           </div>
 
-          <!-- Grid de atributos -->
-          <div class="bg-slate-50 rounded-xl p-4">
-            <div class="grid grid-cols-2 gap-2.5 text-xs">
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/></svg>
-                  <span>Disparo</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.shooting ?? futbolistaForm.shooting) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L5 14h6l-1 8 9-13h-6l0-7z"/></svg>
-                  <span>Velocidad</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.speed ?? futbolistaForm.speed) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 5h12"/><path d="M8 9h8"/><path d="M6 13h12"/><path d="M9 17h6"/><path d="M11 21h2"/></svg>
-                  <span>Regate</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.dribbling ?? futbolistaForm.dribbling) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.7-8 11-4.6-1.3-8-6-8-11V5l8-3zm0 4l-5 2v3c0 3.7 2.2 7.1 5 8.5 2.8-1.4 5-4.8 5-8.5V8l-5-2z"/></svg>
-                  <span>Defensa</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.defense ?? futbolistaForm.defense) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 11.5c1.7 0 3-1.3 3-3V6h2v2.5c0 1.2.9 2.2 2.1 2.4l2.1.4c2.2.4 3.8 2.4 3.8 4.7V18c0 2.2-1.8 4-4 4H9.5C6.5 22 4 19.5 4 16.5V13c0-.8.7-1.5 1.5-1.5H7zm5.5 2.7c-.9-.2-1.8-.6-2.5-1.2-.8.8-1.9 1.3-3.2 1.5V16.5c0 1.7 1.4 3.1 3.1 3.1H16c1 0 1.8-.8 1.8-1.8V16c0-1-.7-1.8-1.7-2l-2.1-.4z"/></svg>
-                  <span>Físico</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.strength ?? futbolistaForm.strength) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c2.2 2.4 4 4.8 4 7.2 0 1.8-.9 3.3-2.3 4.2 3.1.6 5.3 2.8 5.3 5.6 0 3.1-2.9 5-7 5s-7-1.9-7-5c0-2.8 2.2-5 5.3-5.6C8.9 12.5 8 11 8 9.2 8 6.8 9.8 4.4 12 2z"/></svg>
-                  <span>Resistencia</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(playerProfile?.attributes?.stamina ?? futbolistaForm.stamina) }}</p>
-              </div>
-
-              <div class="bg-white rounded-lg p-3 border border-slate-200 col-span-2">
-                <div class="flex items-center gap-2 text-slate-900 font-semibold justify-center sm:justify-start">
-                  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 14c2.2-.1 3.4-1.3 4.6-2.7 1.2-1.3 2.4-2.8 4.7-3.1 2.1-.3 3.8.4 5.3 1.7L21 8l-1.2 4.6c-.8 3.2-3.2 5.5-6.7 6.2-2.6.5-4.8-.1-6.4-1.3-1.8-1.4-2.8-3.5-3.7-3.5z"/></svg>
-                  <span>Aéreo</span>
-                </div>
-                <p class="mt-1.5 text-sm font-bold text-slate-800 text-center sm:text-left">{{ categoriaAtributo(playerProfile?.attributes?.aerial ?? futbolistaForm.aerial) }}</p>
-              </div>
-            </div>
-          </div>
-
           <p class="text-xs text-slate-600">
-            Estos datos se usan para balancear automáticamente los equipos.
-          </p>
-          <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Las categorías de habilidades se interpretan dentro de tu nivel actual ({{ skillTierLabel.label }}). El mismo descriptor no representa exactamente el mismo rendimiento entre distintos niveles.
+            Estas preferencias se usan para balancear roles en los equipos, no para calcular tu nivel operativo.
           </p>
         </div>
         </div>

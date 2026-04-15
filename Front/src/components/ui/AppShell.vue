@@ -101,14 +101,22 @@ const volverAlMenuPrincipal = () => {
             :key="item.name"
             :to="item.to"
             :aria-current="isActive(item) ? 'page' : undefined"
-            class="flex-1 h-11 inline-flex items-center gap-2 justify-center text-sm font-medium transition whitespace-nowrap text-slate-100"
+            class="flex-1 h-11 inline-flex items-center gap-2 justify-center text-sm font-medium transition whitespace-nowrap"
             :class="[
-              isActive(item) ? 'theme-primary-surface' : 'hover:bg-[color:rgba(151,240,125,0.08)]',
+              isActive(item)
+                ? 'theme-primary-surface text-slate-900'
+                : 'text-slate-100 hover:bg-[color:rgba(151,240,125,0.08)]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-bg-elevated)]'
             ]"
+            :style="isActive(item) ? { color: '#02040b' } : undefined"
           >
-            <AppIcon v-if="item.icon" :name="item.icon" :size="16" class="text-slate-100" />
-            {{ item.label }}
+            <AppIcon
+              v-if="item.icon"
+              :name="item.icon"
+              :size="16"
+              :style="isActive(item) ? { color: '#02040b' } : { color: '#f8fafc' }"
+            />
+            <span :style="isActive(item) ? { color: '#02040b' } : undefined">{{ item.label }}</span>
           </router-link>
         </div>
       </nav>

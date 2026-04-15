@@ -20,6 +20,7 @@ public class PartidoVotacionResponseDTO {
     private Integer golesEquipoBPropuesto;
     private String intensidadPartido;
     private Boolean partidoFueParejo;
+    private Boolean partidoAlterado;
     private List<Long> jugadoresDiferenciales;
     private List<PartidoCompaneroAsignadoDTO> companerosAsignados;
     private List<PartidoCompaneroValoracionDTO> valoracionesCompaneros;

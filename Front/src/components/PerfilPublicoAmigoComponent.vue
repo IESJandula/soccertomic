@@ -25,22 +25,11 @@ const resumenVotacion = ref({
 const expandedSections = ref({
   basic: true,
   futbolista: false,
-  competencias: false,
   stats: true,
 })
 
 const toggleSection = (key) => {
   expandedSections.value[key] = !expandedSections.value[key]
-}
-
-const categoriaAtributo = (valor) => {
-  const v = Number(valor)
-  if (!Number.isFinite(v)) return 'Sin dato'
-  if (v <= 1) return 'Inicial'
-  if (v <= 2) return 'Intermedio'
-  if (v <= 3) return 'Competente'
-  if (v <= 4) return 'Fuerte'
-  return 'Destacado'
 }
 
 const posicionPreferidaLabel = computed(() => {
@@ -58,21 +47,20 @@ const tendenciaLabel = computed(() => {
   return 'Adaptable'
 })
 
-const ageRangeLabel = computed(() => {
-  const value = perfil.value?.attributes?.ageRange
-  const map = {
-    '18_25': '18-25',
-    '26_35': '26-35',
-    '36_45': '36-45',
-    '46_PLUS': '46+',
-  }
-  return map[value] || 'No especificado'
+const nivelVisibleTexto = computed(() => {
+  const raw = Number(usuario.value?.nivelVisible)
+  if (!Number.isFinite(raw)) return '0.00'
+  return raw.toFixed(2)
 })
 
-const disponibilidadLabel = computed(() => {
-  const disp = perfil.value?.attributes?.disponibilidad
-  if (!Array.isArray(disp) || disp.length === 0) return 'No especificada'
-  return disp.join(', ')
+const fiabilidadLabelTexto = computed(() => {
+  return usuario.value?.fiabilidadLabel || 'MEDIA'
+})
+
+const fiabilidadLabelClase = computed(() => {
+  if (fiabilidadLabelTexto.value === 'ALTA') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+  if (fiabilidadLabelTexto.value === 'BAJA') return 'bg-rose-100 text-rose-800 border-rose-200'
+  return 'bg-amber-100 text-amber-800 border-amber-200'
 })
 
 const partidosJugados = computed(() => {
@@ -352,7 +340,7 @@ onMounted(cargarPerfil)
         <button type="button" @click="toggleSection('basic')" class="w-full px-4 py-3 flex items-center justify-between text-left">
           <div>
             <h3 class="text-base font-semibold text-slate-800">Información básica</h3>
-            <p class="text-xs text-slate-500">Nombre, rango y disponibilidad</p>
+            <p class="text-xs text-slate-500">Nombre, bio y métricas visibles</p>
           </div>
           <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.basic ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
         </button>
@@ -363,26 +351,24 @@ onMounted(cargarPerfil)
               <p class="text-base font-bold text-slate-900">{{ usuario?.nombre || '-' }}</p>
             </div>
             <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Nivel</p>
-              <p class="text-base font-bold text-slate-900">{{ perfil?.attributes?.skillTier || '-' }}</p>
+              <p class="text-xs text-slate-600 font-semibold">Nivel visible</p>
+              <p class="text-base font-bold text-slate-900">{{ nivelVisibleTexto }}</p>
             </div>
             <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Rating global</p>
-              <p class="text-base font-bold text-slate-900">{{ perfil?.attributes?.globalRating ?? '-' }}</p>
+              <p class="text-xs text-slate-600 font-semibold">Bio</p>
+              <p class="text-sm font-medium text-slate-900">{{ usuario?.bio || 'Sin bio' }}</p>
             </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Pierna buena</p>
-              <p class="text-base font-bold text-slate-900">{{ perfil?.attributes?.piernaBuena || 'No especificada' }}</p>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Rango de edad</p>
-              <p class="text-base font-bold text-slate-900">{{ ageRangeLabel }}</p>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Disponibilidad</p>
-              <p class="text-sm font-bold text-slate-900">{{ disponibilidadLabel }}</p>
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 md:col-span-3">
+              <p class="text-xs text-slate-600 font-semibold">Fiabilidad del perfil</p>
+              <span :class="['inline-flex mt-1 items-center rounded-full border px-2.5 py-1 text-xs font-semibold', fiabilidadLabelClase]">
+                {{ fiabilidadLabelTexto }}
+              </span>
             </div>
           </div>
+
+          <p class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900 mt-3">
+            El nivel visible y la fiabilidad se calculan con datos reales de partidos y votaciones válidas.
+          </p>
         </div>
       </section>
 
@@ -405,30 +391,6 @@ onMounted(cargarPerfil)
               <p class="text-base font-bold text-violet-900">{{ posicionPreferidaLabel }}</p>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section class="card-surface">
-        <button type="button" @click="toggleSection('competencias')" class="w-full px-4 py-3 flex items-center justify-between text-left">
-          <div>
-            <h3 class="text-base font-semibold text-slate-800">Competencias</h3>
-            <p class="text-xs text-slate-500">Resumen por categoría</p>
-          </div>
-          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.competencias ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-        </button>
-        <div v-if="expandedSections.competencias" class="px-4 pb-4 border-t border-slate-100">
-          <div class="grid grid-cols-2 gap-2.5 text-xs mt-3">
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Disparo</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.shooting) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Velocidad</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.speed) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Regate</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.dribbling) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Defensa</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.defense) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Físico</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.strength) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200"><p class="text-slate-900 font-semibold">Resistencia</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.stamina) }}</p></div>
-            <div class="bg-white rounded-lg p-3 border border-slate-200 col-span-2"><p class="text-slate-900 font-semibold">Aéreo</p><p class="mt-1.5 text-sm font-bold text-slate-800">{{ categoriaAtributo(perfil?.attributes?.aerial) }}</p></div>
-          </div>
-          <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-            Las competencias se interpretan ajustadas al rango de edad y al nivel actual del usuario. El mismo descriptor puede representar distinto rendimiento entre rangos.
-          </p>
         </div>
       </section>
 

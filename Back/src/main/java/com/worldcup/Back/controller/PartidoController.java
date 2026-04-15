@@ -1,12 +1,16 @@
 package com.worldcup.Back.controller;
 
 import com.worldcup.Back.dto.request.BalanceTeamsRequestDTO;
+import com.worldcup.Back.dto.request.PartidoIncidenciaRequestDTO;
 import com.worldcup.Back.dto.request.PartidoRequestDTO;
 import com.worldcup.Back.dto.response.EquiposBalanceadosResponseDTO;
 import com.worldcup.Back.dto.response.PartidoBalanceAnalisisResponseDTO;
 import com.worldcup.Back.dto.response.PartidoResponseDTO;
 import com.worldcup.Back.dto.response.PartidoDetalleDTO;
 import com.worldcup.Back.dto.response.PartidoHistorialDTO;
+import com.worldcup.Back.dto.response.PartidoIncidenciaResponseDTO;
+import com.worldcup.Back.dto.response.PartidoIncidenciaResumenDTO;
+import com.worldcup.Back.dto.response.PartidoRatingProcesoResponseDTO;
 import com.worldcup.Back.dto.response.PartidoOrganizadorDTO;
 import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.PartidoOrganizadorEntity;
@@ -57,6 +61,13 @@ public class PartidoController {
         return "Oscuro".equalsIgnoreCase(selected) ? "Negro" : selected;
     }
 
+    private String normalizeModoEquipos(String modo) {
+        if (modo == null || modo.isBlank()) {
+            return "MANUAL";
+        }
+        return "AUTO".equalsIgnoreCase(modo) ? "AUTO" : "MANUAL";
+    }
+
     private List<PartidoOrganizadorDTO> mapOrganizadores(PartidoEntity partido) {
         List<PartidoOrganizadorEntity> relaciones = partidoService.obtenerOrganizadores(partido.getId());
         return relaciones.stream()
@@ -82,6 +93,7 @@ public class PartidoController {
                 partido.getLugar(),
                 partido.getJugadoresPorEquipo(),
                 partido.getTipo().toString(),
+                normalizeModoEquipos(partido.getModoEquipos()),
                 partido.getEstado().toString(),
                 partido.getEquipoA().size(),
                 partido.getEquipoB().size(),
@@ -110,6 +122,7 @@ public class PartidoController {
                 partido.getLugar(),
                 partido.getJugadoresPorEquipo(),
                 partido.getTipo().toString(),
+                normalizeModoEquipos(partido.getModoEquipos()),
                 partido.getEstado().toString(),
                 partido.getJugadoresInscritos().stream().map(userService::entityToResumenDTO).collect(Collectors.toList()),
                 partido.getEquipoA().stream().map(userService::entityToResumenDTO).collect(Collectors.toList()),
@@ -119,6 +132,11 @@ public class PartidoController {
                 estaInscrito,
                 normalizeTeamColor(partido.getColorEquipoA(), "Blanco"),
                 normalizeTeamColor(partido.getColorEquipoB(), "Negro"),
+                partido.getRatingProcesado(),
+                partido.getEstadoCalidad(),
+                partido.getScoreCalidad(),
+                partido.getParticipacionVotacion(),
+                partido.getRatingProcesadoEn(),
                 partido.getCreadoEn(),
                 partido.getActualizadoEn()
         );
@@ -146,6 +164,7 @@ public class PartidoController {
                 com.worldcup.Back.entity.enums.TipoPartido.PUBLICO : 
                 com.worldcup.Back.entity.enums.TipoPartido.PRIVADO);
         }
+        partido.setModoEquipos(normalizeModoEquipos(dto.getModoEquipos()));
         // Asignar colores de equipos (por defecto Blanco y Negro si no se especifican)
         partido.setColorEquipoA(normalizeTeamColor(dto.getColorEquipoA(), "Blanco"));
         partido.setColorEquipoB(normalizeTeamColor(dto.getColorEquipoB(), "Negro"));
@@ -259,6 +278,7 @@ public class PartidoController {
             datosActualizados.setLugar(dto.getLugar());
             datosActualizados.setJugadoresPorEquipo(dto.getJugadoresPorEquipo());
             datosActualizados.setDuracionMinutos(dto.getDuracionMinutos());
+            datosActualizados.setModoEquipos(normalizeModoEquipos(dto.getModoEquipos()));
             
             PartidoEntity actualizado = partidoService.actualizarPartido(id, datosActualizados);
             return ResponseEntity.ok(entityToDTO(actualizado));
@@ -521,6 +541,87 @@ public class PartidoController {
             return ResponseEntity.ok(partidoService.analizarBalancePartido(id));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/{id}/incidencias")
+    public ResponseEntity<?> registrarIncidencia(
+            @PathVariable Long id,
+            HttpServletRequest request,
+            @Valid @RequestBody PartidoIncidenciaRequestDTO body
+    ) {
+        String uid = FirebaseRequestContext.requireUid(request);
+        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        if (solicitante.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PartidoIncidenciaResponseDTO response = partidoService.registrarIncidencia(id, solicitante.get(), body);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/incidencias")
+    public ResponseEntity<?> obtenerIncidencias(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        String uid = FirebaseRequestContext.requireUid(request);
+        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        if (solicitante.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            List<PartidoIncidenciaResponseDTO> response = partidoService.obtenerIncidencias(id, solicitante.get());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/incidencias/resumen")
+    public ResponseEntity<?> obtenerResumenIncidencias(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        String uid = FirebaseRequestContext.requireUid(request);
+        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        if (solicitante.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PartidoIncidenciaResumenDTO response = partidoService.obtenerResumenIncidencias(id, solicitante.get());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/rating/procesar")
+    public ResponseEntity<?> procesarRatingPartido(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        String uid = FirebaseRequestContext.requireUid(request);
+        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        if (solicitante.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            PartidoRatingProcesoResponseDTO response = partidoService.procesarRatingPartido(id, solicitante.get());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
         }
     }
 

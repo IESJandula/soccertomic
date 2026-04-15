@@ -30,6 +30,8 @@ public class PartidoVotacionRequestDTO {
     @NotNull
     private Boolean partidoFueParejo;
 
+    private Boolean partidoAlterado;
+
     private List<Long> jugadoresDiferenciales;
 
     @Valid

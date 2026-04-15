@@ -1,9 +1,10 @@
 package com.worldcup.Back.entity;
 
-import jakarta.persistence.CollectionTable;
+import com.worldcup.Back.entity.enums.TipoIncidenciaPartido;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,16 +20,14 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
-@Table(name = "partido_votacion")
+@Table(name = "partido_incidencia")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class PartidoVotacionEntity {
+public class PartidoIncidenciaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,32 +38,28 @@ public class PartidoVotacionEntity {
     private PartidoEntity partido;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "votante_id", nullable = false)
-    private UsuarioEntity votante;
+    @JoinColumn(name = "usuario_afectado_id", nullable = false)
+    private UsuarioEntity usuarioAfectado;
 
-    @Column(nullable = false)
-    private Integer golesEquipoAPropuesto;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reportado_por_id", nullable = false)
+    private UsuarioEntity reportadoPor;
 
-    @Column(nullable = false)
-    private Integer golesEquipoBPropuesto;
-
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 24)
-    private String intensidadPartido;
+    private TipoIncidenciaPartido tipoIncidencia;
 
     @Column(nullable = false)
-    private Boolean partidoFueParejo;
+    private Integer severidad = 2;
 
     @Column
-    private Boolean partidoAlterado;
+    private Integer minuto;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "partido_votacion_diferenciales", joinColumns = @JoinColumn(name = "votacion_id"))
-    @Column(name = "jugador_id")
-    private List<Long> jugadoresDiferenciales = new ArrayList<>();
+    @Column(length = 255)
+    private String comentario;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "partido_votacion_companeros", joinColumns = @JoinColumn(name = "votacion_id"))
-    private List<PartidoCompaneroValoradoEmbeddable> valoracionesCompaneros = new ArrayList<>();
+    @Column(nullable = false)
+    private Boolean validadaPorOrganizador = true;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

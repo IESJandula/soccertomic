@@ -68,7 +68,7 @@ const handleAuth = async () => {
       return
     }
 
-    uiStore.showToast({ message: 'Sesión iniciada', type: 'success' })
+    uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success' })
 
     router.push(result.profileCompleted ? '/dashboard/partidos' : '/registro/perfil')
   } catch (error) {

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,8 +37,53 @@ public class UsuarioEntity {
     @Column(nullable = true)
     private String foto;
 
+    @Column(nullable = true, length = 400)
+    private String bio;
+
     @Column(nullable = true)
     private String nivel = "beginner"; // beginner, intermedio, avanzado
+
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal ratingMu = new BigDecimal("25.00");
+
+    @Column(nullable = false, precision = 6, scale = 2)
+    private BigDecimal ratingSigma = new BigDecimal("8.33");
+
+    @Column(nullable = false, length = 20)
+    private String ratingVersion = "v1";
+
+    @Column(nullable = false)
+    private Integer partidosJugados = 0;
+
+    @Column(nullable = false)
+    private Integer victorias = 0;
+
+    @Column(nullable = false)
+    private Integer derrotas = 0;
+
+    @Column(nullable = false)
+    private Integer empates = 0;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal fiabilidadScore = new BigDecimal("1.00");
+
+    @Column(nullable = false)
+    private Integer ausencias = 0;
+
+    @Column(nullable = false)
+    private Integer abandonos = 0;
+
+    @Column(nullable = false)
+    private Integer lesiones = 0;
+
+    @Column(nullable = false)
+    private Integer votosEmitidos = 0;
+
+    @Column(nullable = false)
+    private Integer votosValidos = 0;
+
+    @Column(nullable = false)
+    private Integer votosAtipicos = 0;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "usuario_posiciones", joinColumns = @JoinColumn(name = "usuario_id"))

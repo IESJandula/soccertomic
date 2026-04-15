@@ -17,6 +17,7 @@ public class PartidoRequestDTO {
     private Integer jugadoresPorEquipo; // 1-11
     private Integer duracionMinutos; // Default 60
     private String tipo; // PRIVADO o PUBLICO
+    private String modoEquipos; // MANUAL o AUTO
     private String colorEquipoA; // Color del equipo A
     private String colorEquipoB; // Color del equipo B
     private Long convocarEquipoRapidoId; // Equipo rapido a convocar opcionalmente

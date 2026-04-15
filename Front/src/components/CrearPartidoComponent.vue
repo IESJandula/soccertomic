@@ -11,16 +11,24 @@ const router = useRouter()
 const partidoStore = usePartidoStore()
 const uiStore = useUiStore()
 
+const toLocalDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Valores por defecto: Universidad de Jaén, 22:00, día siguiente, 7vs7, privado
 const tomorrow = new Date()
 tomorrow.setDate(tomorrow.getDate() + 1)
 
 const form = ref({
-  fecha: tomorrow.toISOString().slice(0, 10),
+  fecha: toLocalDateInput(tomorrow),
   hora: '22:00',
   lugar: 'Universidad de Jaén',
   jugadoresPorEquipo: 7,
   tipo: 'PRIVADO',
+  modoEquipos: 'MANUAL',
   colorEquipoA: 'Blanco',
   colorEquipoB: 'Negro',
   convocarEquipoRapido: false,
@@ -103,14 +111,16 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    const fechaHora = new Date(`${form.value.fecha}T${form.value.hora}:00`)
+    const fechaHoraLocal = `${form.value.fecha}T${form.value.hora}:00`
 
     const payload = {
-      fecha: fechaHora.toISOString(),
+      // Enviamos hora local sin zona para evitar desfases UTC en backend (LocalDateTime).
+      fecha: fechaHoraLocal,
       lugar: form.value.lugar.trim(),
       jugadoresPorEquipo: Number(form.value.jugadoresPorEquipo),
       duracionMinutos: 60,
       tipo: form.value.tipo,
+      modoEquipos: form.value.modoEquipos,
       colorEquipoA: form.value.colorEquipoA,
       colorEquipoB: form.value.colorEquipoB,
       convocarEquipoRapidoId: form.value.convocarEquipoRapido ? Number(form.value.convocarEquipoRapidoId) : null,
@@ -173,6 +183,18 @@ const handleCancel = () => {
             >
               <option value="PRIVADO">Privado (invitación)</option>
               <option value="PUBLICO">Público (abierto)</option>
+            </select>
+          </label>
+
+          <label class="block lg:col-span-2">
+            <span class="block text-xs font-medium text-slate-700 mb-0.5">Modo de equipos</span>
+            <select
+              v-model="form.modoEquipos"
+              :disabled="loading"
+              class="w-full h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="MANUAL">Manual (equipos armados por organizador)</option>
+              <option value="AUTO">Auto (balance automático por nivel visible)</option>
             </select>
           </label>
         </div>

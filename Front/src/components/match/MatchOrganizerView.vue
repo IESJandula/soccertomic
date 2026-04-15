@@ -199,8 +199,8 @@
                 {{ jugador.nombre }}
                 <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
               </p>
-              <p class="text-xs text-slate-600" v-if="jugador.skillTier || jugador.playTendency">
-                {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+              <p class="text-xs text-slate-600" v-if="jugador.playTendency">
+                Tendencia: {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
           </div>
@@ -340,8 +340,8 @@
                   {{ jugador.nombre }}
                   <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 </p>
-                <p class="text-xs text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
-                  {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+                <p class="text-xs text-slate-300" v-if="jugador.playTendency">
+                  Tendencia: {{ formatTendencia(jugador.playTendency) }}
                 </p>
               </div>
             </div>
@@ -450,8 +450,8 @@
                   {{ jugador.nombre }}
                   <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 </p>
-                <p class="text-xs text-slate-300" v-if="jugador.skillTier || jugador.playTendency">
-                  {{ formatNivel(jugador.skillTier) }} • {{ formatTendencia(jugador.playTendency) }}
+                <p class="text-xs text-slate-300" v-if="jugador.playTendency">
+                  Tendencia: {{ formatTendencia(jugador.playTendency) }}
                 </p>
               </div>
             </div>
@@ -778,17 +778,6 @@ const organizadoresElegibles = computed(() => {
 
 const formatearFecha = (fecha) => {
   return formatDateTimeEs(fecha)
-}
-
-const formatNivel = (skillTier) => {
-  if (!skillTier) return ''
-  const niveles = {
-    'BRONCE': 'Bronce',
-    'PLATA': 'Plata',
-    'ORO': 'Oro',
-    'DIAMANTE': 'Diamante'
-  }
-  return niveles[skillTier] || skillTier
 }
 
 const formatTendencia = (playTendency) => {

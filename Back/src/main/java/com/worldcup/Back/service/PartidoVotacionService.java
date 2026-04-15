@@ -115,6 +115,7 @@ public class PartidoVotacionService {
         entity.setGolesEquipoBPropuesto(dto.getGolesEquipoBPropuesto());
         entity.setIntensidadPartido(normalizarIntensidad(dto.getIntensidadPartido()));
         entity.setPartidoFueParejo(Boolean.TRUE.equals(dto.getPartidoFueParejo()));
+        entity.setPartidoAlterado(dto.getPartidoAlterado() == null ? null : Boolean.TRUE.equals(dto.getPartidoAlterado()));
         entity.setJugadoresDiferenciales(new ArrayList<>(normalizarIds(dto.getJugadoresDiferenciales())));
         entity.setValoracionesCompaneros(mapearValoraciones(dto.getValoracionesCompaneros()));
         entity.setActualizadaEn(LocalDateTime.now());
@@ -426,6 +427,7 @@ public class PartidoVotacionService {
                 entity.getGolesEquipoBPropuesto(),
                 entity.getIntensidadPartido(),
                 entity.getPartidoFueParejo(),
+                entity.getPartidoAlterado(),
                 entity.getJugadoresDiferenciales(),
                 toAsignadosDTO(asignados),
                 valoracionesCompaneros,
