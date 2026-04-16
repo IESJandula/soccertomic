@@ -20,9 +20,8 @@ const mesesHistorialVisibles = ref(2)
 const diaSeleccionadoKey = ref('')
 const mostrandoDetalleDia = ref(false)
 const expandedSections = ref({
-  basic: false,
+  ficha: false,
   stats: false,
-  futbolista: false,
 })
 const editandoFutbolista = ref(false)
 const resumenVotacion = ref({
@@ -33,7 +32,6 @@ const resumenVotacion = ref({
 
 const form = ref({
   nombre: '',
-  bio: '',
 })
 
 const preferenciasFutbolista = ref({
@@ -70,7 +68,6 @@ const cargarDatos = async () => {
     })
     resumenVotacion.value = votacionResumenData || { vecesDiferencial: 0, valoracionesPositivas: 0, valoracionesNegativas: 0 }
     form.value.nombre = resumenData?.nombre || ''
-    form.value.bio = resumenData?.bio || ''
     preferenciasFutbolista.value = {
       playStyle: profileData?.attributes?.playStyle || 'A',
       posicionPreferida: profileData?.attributes?.posicionPreferida || (profileData?.attributes?.goalkeeper ? 'PORTERO' : 'MEDIOCAMPISTA'),
@@ -96,10 +93,10 @@ const guardarInformacionBasica = async () => {
   ok.value = ''
 
   try {
-    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email, form.value.bio || '')
+    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email)
     await authStore.refreshUsuario()
     await cargarDatos()
-    ok.value = 'Información básica actualizada correctamente'
+    ok.value = 'Ficha de jugador actualizada correctamente'
   } catch (err) {
     error.value = err?.message || 'No se pudo guardar la información'
   } finally {
@@ -110,9 +107,8 @@ const guardarInformacionBasica = async () => {
 const toggleSection = (key) => {
   const estabaAbierta = expandedSections.value[key]
   expandedSections.value = {
-    basic: false,
+    ficha: false,
     stats: false,
-    futbolista: false,
   }
   if (!estabaAbierta) {
     expandedSections.value[key] = true
@@ -132,28 +128,16 @@ const guardarPerfilFutbolista = async () => {
       },
     })
     await cargarDatos()
-    ok.value = 'Perfil futbolista actualizado'
+    ok.value = 'Ficha de jugador actualizada correctamente'
   } catch (err) {
-    error.value = err?.message || 'No se pudo guardar el perfil futbolista'
+    error.value = err?.message || 'No se pudo guardar la ficha de jugador'
   } finally {
     saving.value = false
   }
 }
 
-const resumenInfoBasica = computed(() => {
-  const partes = []
-  if ((form.value.nombre || '').trim()) partes.push('nombre configurado')
-  if ((form.value.bio || '').trim()) partes.push('bio configurada')
-  return partes.length ? partes.join(' · ') : 'Completa tus datos básicos'
-})
-
 const resumenEstadisticas = computed(() => {
   return `${partidosJugados.value} partidos jugados · ${historialPartidos.value.length} en historial`
-})
-
-const resumenPerfilFutbolista = computed(() => {
-  if (!playerProfile.value?.attributes && !editandoFutbolista.value) return 'Configura tu perfil futbolista'
-  return `${tendenciaPreferidaLabel.value} · ${posicionPreferidaLabel.value}`
 })
 
 const tendenciaPreferidaLabel = computed(() => {
@@ -193,6 +177,24 @@ const claseBannerResultado = (resultado) => {
 const marcadorEntero = (valor) => {
   const numero = Number(valor)
   return Number.isFinite(numero) ? Math.round(numero) : 0
+}
+
+const mostrarAmbosResultados = (partido) => {
+  return Boolean(partido?.mostrarAmbosResultados)
+}
+
+const resultadoBaseLabel = (partido) => {
+  const golesA = partido?.golesBaseEquipoA
+  const golesB = partido?.golesBaseEquipoB
+  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Base: -'
+  return `Base: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
+}
+
+const resultadoConsensuadoLabel = (partido) => {
+  const golesA = partido?.golesConsensuadoEquipoA
+  const golesB = partido?.golesConsensuadoEquipoB
+  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Consensuado: -'
+  return `Consensuado: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
 }
 
 const formatearResultado = (resultado) => {
@@ -399,46 +401,6 @@ const nivelSocialExperiencia = computed(() => {
   return 'Inicial'
 })
 
-const nivelVisibleTexto = computed(() => {
-  const raw = Number(resumen.value?.nivelVisible)
-  if (!Number.isFinite(raw)) return '0.00'
-  return raw.toFixed(2)
-})
-
-const nivelVisibleRaw = computed(() => {
-  const raw = Number(resumen.value?.nivelVisible)
-  if (!Number.isFinite(raw)) return 0
-  return Math.max(0, raw)
-})
-
-const nivelBase = computed(() => Math.floor(nivelVisibleRaw.value))
-const siguienteNivel = computed(() => nivelBase.value + 1)
-const nivelProgresoPct = computed(() => {
-  const fraccion = nivelVisibleRaw.value - nivelBase.value
-  const pct = Math.round(fraccion * 100)
-  return Math.max(0, Math.min(100, pct))
-})
-
-const puntosParaSiguienteNivel = computed(() => {
-  const diff = siguienteNivel.value - nivelVisibleRaw.value
-  return Math.max(0, diff).toFixed(2)
-})
-
-const fiabilidadLabelTexto = computed(() => {
-  return resumen.value?.fiabilidadLabel || 'MEDIA'
-})
-
-const confianzaNivelTexto = computed(() => {
-  if (fiabilidadLabelTexto.value === 'ALTA') return 'Muy estable'
-  if (fiabilidadLabelTexto.value === 'BAJA') return 'En ajuste'
-  return 'Estable'
-})
-
-const fiabilidadLabelClase = computed(() => {
-  if (fiabilidadLabelTexto.value === 'ALTA') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-  if (fiabilidadLabelTexto.value === 'BAJA') return 'bg-rose-100 text-rose-800 border-rose-200'
-  return 'bg-amber-100 text-amber-800 border-amber-200'
-})
 </script>
 
 <template>
@@ -453,84 +415,81 @@ const fiabilidadLabelClase = computed(() => {
       <div v-if="ok" class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg" role="status" aria-live="polite">{{ ok }}</div>
 
       <section class="bg-white rounded-xl shadow">
-        <button type="button" @click="toggleSection('basic')" class="w-full px-4 py-3 flex items-center justify-between text-left">
+        <button type="button" @click="toggleSection('ficha')" class="w-full px-4 py-3 flex items-center justify-between text-left">
           <div class="min-w-0">
-            <h2 class="text-lg font-semibold text-gray-800">Información básica</h2>
-            <p class="text-xs text-slate-500 truncate">{{ resumenInfoBasica }}</p>
+            <h2 class="text-lg font-semibold text-gray-800">Ficha de jugador</h2>
+            <p class="text-xs text-slate-500 truncate">{{ tendenciaPreferidaLabel }} · {{ posicionPreferidaLabel }}</p>
           </div>
-          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.basic ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.ficha ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
         </button>
         <transition name="accordion">
-        <div v-if="expandedSections.basic" class="px-4 pb-4 space-y-3 border-t border-slate-100 overflow-hidden">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-slate-600 font-semibold">Nivel actual</p>
-                <span class="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
-                  Nivel {{ nivelBase }}
-                </span>
-              </div>
-              <p class="text-2xl font-bold text-slate-900 mt-1">{{ nivelVisibleTexto }}</p>
-              <div class="mt-2">
-                <div class="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
-                  <div class="h-full rounded-full bg-lime-500 transition-all duration-500" :style="{ width: `${nivelProgresoPct}%` }"></div>
-                </div>
-                <div class="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Nivel {{ nivelBase }}</span>
-                  <span>{{ nivelProgresoPct }}%</span>
-                  <span>Nivel {{ siguienteNivel }}</span>
-                </div>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-2">
-                Te faltan {{ puntosParaSiguienteNivel }} puntos para subir al nivel {{ siguienteNivel }}.
-              </p>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p class="text-xs text-slate-600 font-semibold">Confianza del nivel</p>
-              <span :class="['inline-flex mt-1 items-center rounded-full border px-2.5 py-1 text-xs font-semibold', fiabilidadLabelClase]">
-                {{ confianzaNivelTexto }}
-              </span>
-              <p class="text-[11px] text-slate-500 mt-1">Tu nivel será más preciso cuando tengas más actividad.</p>
-              <p class="text-[11px] text-slate-600 mt-2 font-semibold">Cómo mejorarla:</p>
-              <ul class="text-[11px] text-slate-500 mt-1 space-y-0.5 list-disc pl-4">
-                <li>Juega partidos completos con regularidad.</li>
-                <li>Vota al final de cada partido.</li>
-                <li>Evita ausencias y abandonos.</li>
-              </ul>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-3">
-              <p class="text-xs text-slate-600 font-semibold">Preferencia de juego</p>
-              <p class="text-base font-bold text-slate-900">{{ tendenciaPreferidaLabel }} · {{ posicionPreferidaLabel }}</p>
-              <p class="text-[11px] text-slate-500 mt-1">Nos ayuda a armar equipos más equilibrados</p>
-            </div>
-          </div>
-
-          <p class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
-            Este bloque te resume de forma rápida cómo va tu progresión en la app.
-          </p>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div v-if="expandedSections.ficha" class="px-4 pb-4 space-y-3 border-t border-slate-100 overflow-hidden">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
             <div>
               <label class="block text-xs font-semibold text-gray-700 mb-1">Nombre</label>
               <input v-model="form.nombre" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-gray-700 mb-1">Bio (opcional)</label>
-              <textarea
-                v-model="form.bio"
-                maxlength="400"
-                rows="3"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                placeholder="Cuéntanos brevemente cómo juegas"
-              />
-              <p class="text-[11px] text-slate-500 mt-1">{{ (form.bio || '').length }}/400</p>
             </div>
           </div>
 
           <div>
             <button @click="guardarInformacionBasica" :disabled="saving" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60">
-              {{ saving ? 'Guardando...' : 'Guardar información' }}
+              {{ saving ? 'Guardando...' : 'Guardar ficha' }}
             </button>
+          </div>
+
+          <div v-if="!playerProfile && !editandoFutbolista" class="text-center py-8">
+            <p class="text-gray-600 mb-4">Aún no has completado tu perfil futbolístico.</p>
+            <button
+              @click="editandoFutbolista = true"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium transition"
+            >
+              Configurar ficha de jugador
+            </button>
+          </div>
+
+          <div v-else class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="bg-white border-2 border-blue-300 rounded-xl p-4 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Tendencia</p>
+                <p class="text-2xl md:text-3xl font-bold text-slate-900">
+                  {{ tendenciaPreferidaLabel }}
+                </p>
+              </div>
+              <div class="bg-white border-2 border-violet-300 rounded-xl p-4 text-center shadow-sm">
+                <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Posición preferida</p>
+                <p class="text-2xl md:text-3xl font-bold text-slate-900">
+                  {{ posicionPreferidaLabel }}
+                </p>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 rounded-xl p-3 space-y-3 border border-slate-200">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Actualizar tendencia</label>
+                  <select v-model="preferenciasFutbolista.playStyle" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                    <option value="O">Ofensiva</option>
+                    <option value="D">Defensiva</option>
+                    <option value="A">Adaptable</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Actualizar posición preferida</label>
+                  <select v-model="preferenciasFutbolista.posicionPreferida" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                    <option value="DELANTERO">Delantero</option>
+                    <option value="MEDIOCAMPISTA">Mediocampista</option>
+                    <option value="DEFENSA">Defensa</option>
+                    <option value="PORTERO">Portero</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <button @click="guardarPerfilFutbolista" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60">
+                  {{ saving ? 'Guardando...' : 'Guardar preferencias' }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         </transition>
@@ -636,8 +595,12 @@ const fiabilidadLabelClase = computed(() => {
                   <p class="text-xs md:text-sm opacity-90 truncate">{{ formatearFecha(partido.fecha) }}</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <p class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-white/20 text-white border border-white/40">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
+                  <div v-if="mostrarAmbosResultados(partido)" class="text-right leading-tight">
+                    <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoBaseLabel(partido) }}</p>
+                    <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoConsensuadoLabel(partido) }}</p>
+                  </div>
+                  <p v-else class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-slate-300 text-slate-900 border border-slate-400">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
                 </div>
               </article>
             </div>
@@ -703,81 +666,6 @@ const fiabilidadLabelClase = computed(() => {
         </transition>
       </section>
 
-      <section class="bg-white rounded-xl shadow">
-        <button type="button" @click="toggleSection('futbolista')" class="w-full px-4 py-3 flex items-center justify-between text-left">
-          <div class="min-w-0">
-            <h2 class="text-lg font-semibold text-gray-800">Perfil futbolista</h2>
-            <p class="text-xs text-slate-500 truncate">{{ resumenPerfilFutbolista }}</p>
-          </div>
-          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.futbolista ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-        </button>
-        <transition name="accordion">
-        <div v-if="expandedSections.futbolista" class="px-4 pb-4 border-t border-slate-100 overflow-hidden">
-        <div class="flex items-center justify-between mb-4 mt-3">
-          <h3 class="text-sm font-semibold text-gray-700">Resumen técnico</h3>
-        </div>
-
-        <div v-if="!playerProfile && !editandoFutbolista" class="text-center py-8">
-          <p class="text-gray-600 mb-4">Aún no has completado tu perfil futbolístico.</p>
-          <button
-            @click="editandoFutbolista = true"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium transition"
-          >
-            Configurar perfil futbolista
-          </button>
-        </div>
-
-        <div v-else class="space-y-3">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div class="bg-white border-2 border-blue-300 rounded-xl p-4 text-center shadow-sm">
-              <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Tendencia</p>
-              <p class="text-2xl md:text-3xl font-bold text-slate-900">
-                {{ tendenciaPreferidaLabel }}
-              </p>
-            </div>
-            <div class="bg-white border-2 border-violet-300 rounded-xl p-4 text-center shadow-sm">
-              <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Posición preferida</p>
-              <p class="text-2xl md:text-3xl font-bold text-slate-900">
-                {{ posicionPreferidaLabel }}
-              </p>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 rounded-xl p-3 space-y-3 border border-slate-200">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Actualizar tendencia</label>
-                <select v-model="preferenciasFutbolista.playStyle" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                  <option value="O">Ofensiva</option>
-                  <option value="D">Defensiva</option>
-                  <option value="A">Adaptable</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Actualizar posición preferida</label>
-                <select v-model="preferenciasFutbolista.posicionPreferida" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                  <option value="DELANTERO">Delantero</option>
-                  <option value="MEDIOCAMPISTA">Mediocampista</option>
-                  <option value="DEFENSA">Defensa</option>
-                  <option value="PORTERO">Portero</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="flex justify-end">
-              <button @click="guardarPerfilFutbolista" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60">
-                {{ saving ? 'Guardando...' : 'Guardar cambios de perfil futbolista' }}
-              </button>
-            </div>
-          </div>
-
-          <p class="text-xs text-slate-600">
-            Estas preferencias se usan para balancear roles en los equipos, no para calcular tu nivel operativo.
-          </p>
-        </div>
-        </div>
-        </transition>
-      </section>
     </div>
   </div>
 </template>

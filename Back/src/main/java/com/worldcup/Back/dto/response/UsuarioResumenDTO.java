@@ -1,6 +1,5 @@
 package com.worldcup.Back.dto.response;
 
-import java.math.BigDecimal;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,11 +14,8 @@ public class UsuarioResumenDTO {
     private Long id;
     private String nombre;
     private String email;
-    private String bio;
     private String nivel;
     private Integer reputacionPositiva;
     private List<String> rasgos;
     private String playTendency;
-    private BigDecimal nivelVisible;
-    private String fiabilidadLabel;
 }

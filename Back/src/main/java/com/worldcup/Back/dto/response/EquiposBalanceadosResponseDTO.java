@@ -5,8 +5,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
-
+/**
+ * Simple balance result: only exposes final levels and state.
+ * Keeps internals opaque (no explanations, no intermediate data).
+ */
 @Getter
 @Setter
 @AllArgsConstructor
@@ -15,12 +17,12 @@ public class EquiposBalanceadosResponseDTO {
     private Long partidoId;
     private Integer nivelTotalEquipoA;
     private Integer nivelTotalEquipoB;
+    private Boolean balanceadoDespues;
+    
+    // Deprecated: kept for backward compatibility but no longer used
     private Integer diferenciaNivelAntes;
     private Integer diferenciaNivelDespues;
     private Boolean balanceadoAntes;
-    private Boolean balanceadoDespues;
-    private List<String> razonesDesbalance;
-    private List<String> cambiosAplicados;
-    private List<JugadorBalanceadoDTO> equipoA;
-    private List<JugadorBalanceadoDTO> equipoB;
+    private String resumenOrganizador;
+    private String motivoPrincipal;
 }

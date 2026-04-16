@@ -84,16 +84,14 @@ public class PlayerProfileController {
             HttpServletRequest request,
             @PathVariable Long usuarioId
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-
-        Optional<UsuarioEntity> requester = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity requester = userService.obtenerOCrearDesdeRequest(request);
         Optional<UsuarioEntity> target = userService.buscarPorId(usuarioId);
 
-        if (requester.isEmpty() || target.isEmpty()) {
+        if (target.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        if (!amistadService.sonAmigos(requester.get(), target.get())) {
+        if (!amistadService.sonAmigos(requester, target.get())) {
             return ResponseEntity.status(403).build();
         }
 

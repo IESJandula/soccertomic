@@ -12,7 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -45,15 +44,10 @@ public class EquipoRapidoInvitacionController {
             @RequestParam Long equipoRapidoId,
             @RequestParam Long usuarioId
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> emisor = userService.buscarPorFirebaseUid(uid);
-
-        if (emisor.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity emisor = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.crearInvitacion(equipoRapidoId, usuarioId, emisor.get());
+            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.crearInvitacion(equipoRapidoId, usuarioId, emisor);
             return ResponseEntity.ok(toDTO(invitacion));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -62,14 +56,9 @@ public class EquipoRapidoInvitacionController {
 
     @GetMapping("/mis-invitaciones")
     public ResponseEntity<List<EquipoRapidoInvitacionResponseDTO>> obtenerMisInvitaciones(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        List<EquipoRapidoInvitacionResponseDTO> dtos = equipoRapidoInvitacionService.obtenerInvitacionesDeUsuario(usuario.get())
+        List<EquipoRapidoInvitacionResponseDTO> dtos = equipoRapidoInvitacionService.obtenerInvitacionesDeUsuario(usuario)
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -81,15 +70,10 @@ public class EquipoRapidoInvitacionController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.aceptarInvitacion(id, usuario.get());
+            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.aceptarInvitacion(id, usuario);
             return ResponseEntity.ok(toDTO(invitacion));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -101,15 +85,10 @@ public class EquipoRapidoInvitacionController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.rechazarInvitacion(id, usuario.get());
+            EquipoRapidoInvitacionEntity invitacion = equipoRapidoInvitacionService.rechazarInvitacion(id, usuario);
             return ResponseEntity.ok(toDTO(invitacion));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

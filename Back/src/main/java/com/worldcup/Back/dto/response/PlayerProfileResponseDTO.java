@@ -35,6 +35,7 @@ public class PlayerProfileResponseDTO {
         private String skillTier;
         private String playTendency;
         private String ageRange;
+        private Integer selfAssessment;
         private Float globalRating;
         private String piernaBuena;
         private java.util.List<String> disponibilidad;

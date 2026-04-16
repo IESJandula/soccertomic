@@ -78,6 +78,9 @@ public class PlayerProfileEntity {
     @Column(name = "experience_level", nullable = false, length = 20)
     private String ageRange = "18_25"; // UNDER_18, 18_25, 25_35, 35_50, OVER_50
 
+    @Column(nullable = true)
+    private Integer selfAssessment; // 1 (muy baja) a 5 (muy alta)
+
     // ===== RATING GLOBAL =====
     @Column(nullable = false)
     private Float globalRating = 3.0f;

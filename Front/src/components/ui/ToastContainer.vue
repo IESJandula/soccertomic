@@ -5,6 +5,7 @@ const uiStore = useUiStore()
 
 const classesByType = {
   'login-success': 'bg-[color:var(--color-primary)] border-[color:rgba(2,4,11,0.45)]',
+  'join-success': 'bg-[color:var(--color-primary)] border-[color:rgba(2,4,11,0.45)]',
   success: 'bg-[color:var(--color-primary)] border-[color:rgba(2,4,11,0.35)]',
   error: 'theme-danger-surface border-transparent',
   warning: 'theme-chip-muted border-transparent',
@@ -12,7 +13,8 @@ const classesByType = {
 }
 
 const textClassesByType = {
-  'login-success': 'text-slate-900',
+  'login-success': 'toast-lime-text',
+  'join-success': 'toast-lime-text',
   success: 'text-slate-900',
   error: 'text-slate-100',
   warning: 'text-slate-100',
@@ -20,7 +22,8 @@ const textClassesByType = {
 }
 
 const closeClassesByType = {
-  'login-success': 'text-slate-900 hover:text-black',
+  'login-success': 'toast-lime-close',
+  'join-success': 'toast-lime-close',
   success: 'text-slate-900/90 hover:text-slate-900',
   error: 'text-slate-100/90 hover:text-slate-100',
   warning: 'text-slate-100/90 hover:text-slate-100',
@@ -28,12 +31,10 @@ const closeClassesByType = {
 }
 
 const textStyleByType = {
-  'login-success': { color: '#02040b' },
   success: { color: '#02040b' },
 }
 
 const closeStyleByType = {
-  'login-success': { color: '#02040b' },
   success: { color: '#02040b' },
 }
 </script>
@@ -64,3 +65,17 @@ const closeStyleByType = {
     </div>
   </div>
 </template>
+
+<style scoped>
+.toast-lime-text {
+  color: #02040b !important;
+}
+
+.toast-lime-close {
+  color: #02040b !important;
+}
+
+.toast-lime-close:hover {
+  color: #000000 !important;
+}
+</style>

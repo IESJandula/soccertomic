@@ -7,8 +7,10 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 public class FirebaseAdminConfig {
@@ -22,19 +24,16 @@ public class FirebaseAdminConfig {
     @Value("${auth.firebase.credentials-path:../variables-entorno/firebase-service-account.json}")
     private String firebaseCredentialsPath;
 
+    @Value("${auth.firebase.credentials-json:}")
+    private String firebaseCredentialsJson;
+
     @PostConstruct
     public void initFirebaseAdmin() throws IOException {
         if (!firebaseEnabled || !FirebaseApp.getApps().isEmpty()) {
             return;
         }
 
-        if (firebaseCredentialsPath == null || firebaseCredentialsPath.isBlank()) {
-            throw new IllegalStateException(
-                "Firebase credentials required. Set FIREBASE_CREDENTIALS_PATH environment variable or place firebase-service-account.json in variables-entorno/"
-            );
-        }
-
-        GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(firebaseCredentialsPath));
+        GoogleCredentials credentials = loadCredentials();
 
         FirebaseOptions.Builder builder = FirebaseOptions.builder()
                 .setCredentials(credentials);
@@ -44,5 +43,21 @@ public class FirebaseAdminConfig {
         }
 
         FirebaseApp.initializeApp(builder.build());
+    }
+
+    private GoogleCredentials loadCredentials() throws IOException {
+        if (firebaseCredentialsJson != null && !firebaseCredentialsJson.isBlank()) {
+            return GoogleCredentials.fromStream(
+                new ByteArrayInputStream(firebaseCredentialsJson.getBytes(StandardCharsets.UTF_8))
+            );
+        }
+
+        if (firebaseCredentialsPath == null || firebaseCredentialsPath.isBlank()) {
+            throw new IllegalStateException(
+                "Firebase credentials required. Set auth.firebase.credentials-json or auth.firebase.credentials-path"
+            );
+        }
+
+        return GoogleCredentials.fromStream(new FileInputStream(firebaseCredentialsPath));
     }
 }

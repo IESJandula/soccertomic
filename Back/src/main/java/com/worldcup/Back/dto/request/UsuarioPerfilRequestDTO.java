@@ -12,5 +12,4 @@ import lombok.Setter;
 public class UsuarioPerfilRequestDTO {
     private String nombre;
     private String email;
-    private String bio;
 }

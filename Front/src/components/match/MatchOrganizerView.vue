@@ -293,7 +293,7 @@
       <!-- Equipo A -->
       <article class="p-4 border-2 space-y-3 rounded-lg shadow-sm card-surface" :style="teamAColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-100">
+          <h2 class="text-xl font-bold flex items-center gap-2" :style="teamAColor.titleStyle">
             <span class="inline-flex h-8 w-8 items-center justify-center rounded-full" :style="teamAColor.chipStyle">
               <AppIcon name="soccer" :size="14" :style="teamAColor.iconStyle" />
             </span>
@@ -304,7 +304,7 @@
           </span>
         </div>
 
-        <div v-if="!partida.equipoA || partida.equipoA.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
+        <div v-if="!partida.equipoA || partida.equipoA.length === 0" class="text-sm italic p-4 rounded-lg text-center" :style="teamAColor.mutedTextStyle">
           Sin personas asignadas
         </div>
 
@@ -336,11 +336,11 @@
                 <AppIcon name="user" :size="16" :style="teamAColor.iconStyle" />
               </div>
               <div class="min-w-0">
-                <p class="font-semibold text-slate-100">
+                <p class="font-semibold" :style="teamAColor.playerTextStyle">
                   {{ jugador.nombre }}
                   <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 </p>
-                <p class="text-xs text-slate-300" v-if="jugador.playTendency">
+                <p class="text-xs" :style="teamAColor.mutedTextStyle" v-if="jugador.playTendency">
                   Tendencia: {{ formatTendencia(jugador.playTendency) }}
                 </p>
               </div>
@@ -362,7 +362,8 @@
                 type="button"
                 @click="quitarCoorganizador(jugador)"
                 :disabled="gestionandoOrganizador === `remove-${jugador.id}`"
-                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-slate-100 border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                :style="teamAColor.buttonTextStyle"
                 title="Quitar rol de coorganización"
               >
                 <span v-if="gestionandoOrganizador === `remove-${jugador.id}`">Procesando</span>
@@ -374,7 +375,8 @@
                 type="button"
                 @click="delegarOrganizacion(jugador)"
                 :disabled="gestionandoOrganizador === `add-${jugador.id}`"
-                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-slate-100 border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                :style="teamAColor.buttonTextStyle"
                 title="Delegar responsabilidades de organización"
               >
                 <span v-if="gestionandoOrganizador === `add-${jugador.id}`">Procesando</span>
@@ -400,7 +402,7 @@
       <!-- Equipo B -->
       <article class="p-4 border-2 space-y-3 rounded-lg shadow-sm card-surface" :style="teamBColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-100">
+          <h2 class="text-xl font-bold flex items-center gap-2" :style="teamBColor.titleStyle">
             <span class="inline-flex h-8 w-8 items-center justify-center rounded-full" :style="teamBColor.chipStyle">
               <AppIcon name="soccer" :size="14" :style="teamBColor.iconStyle" />
             </span>
@@ -411,7 +413,7 @@
           </span>
         </div>
 
-        <div v-if="!partida.equipoB || partida.equipoB.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
+        <div v-if="!partida.equipoB || partida.equipoB.length === 0" class="text-sm italic p-4 rounded-lg text-center" :style="teamBColor.mutedTextStyle">
           Sin personas asignadas
         </div>
 
@@ -446,11 +448,11 @@
                 <AppIcon name="user" :size="16" :style="teamBColor.iconStyle" />
               </div>
               <div class="min-w-0">
-                <p class="font-semibold text-slate-100">
+                <p class="font-semibold" :style="teamBColor.playerTextStyle">
                   {{ jugador.nombre }}
                   <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 </p>
-                <p class="text-xs text-slate-300" v-if="jugador.playTendency">
+                <p class="text-xs" :style="teamBColor.mutedTextStyle" v-if="jugador.playTendency">
                   Tendencia: {{ formatTendencia(jugador.playTendency) }}
                 </p>
               </div>
@@ -472,7 +474,8 @@
                 type="button"
                 @click="quitarCoorganizador(jugador)"
                 :disabled="gestionandoOrganizador === `remove-${jugador.id}`"
-                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-slate-100 border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                :style="teamBColor.buttonTextStyle"
                 title="Quitar rol de coorganización"
               >
                 <span v-if="gestionandoOrganizador === `remove-${jugador.id}`">Procesando</span>
@@ -484,7 +487,8 @@
                 type="button"
                 @click="delegarOrganizacion(jugador)"
                 :disabled="gestionandoOrganizador === `add-${jugador.id}`"
-                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-slate-100 border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-[color:rgba(151,240,125,0.24)] bg-[color:rgba(102,63,77,0.22)] hover:bg-[color:rgba(102,63,77,0.34)]"
+                :style="teamBColor.buttonTextStyle"
                 title="Delegar responsabilidades de organización"
               >
                 <span v-if="gestionandoOrganizador === `add-${jugador.id}`">Procesando</span>
@@ -557,26 +561,95 @@ const teamPalette = {
   Morado: { jersey: '#a855f7', onJersey: '#ffffff', border: 'rgba(168, 85, 247, 0.55)', aura: 'rgba(168, 85, 247, 0.18)' },
 }
 
+const normalizeTeamColorKey = (value) => {
+  if (!value) return ''
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+const rgbStringToHex = (value) => {
+  const match = String(value).match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/i)
+  if (!match) return null
+  const r = Math.max(0, Math.min(255, Number(match[1])))
+  const g = Math.max(0, Math.min(255, Number(match[2])))
+  const b = Math.max(0, Math.min(255, Number(match[3])))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+const toHexColor = (value) => {
+  if (!value) return null
+  const raw = String(value).trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`
+  }
+  return rgbStringToHex(raw)
+}
+
+const isForcedBlackTextTeam = (value) => {
+  const key = normalizeTeamColorKey(value)
+  return key === 'blanco' || key === 'amarillo'
+}
+
+const isLightJersey = (hexColor) => {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length !== 7) return false
+  const r = parseInt(hexColor.slice(1, 3), 16)
+  const g = parseInt(hexColor.slice(3, 5), 16)
+  const b = parseInt(hexColor.slice(5, 7), 16)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminance >= 0.68
+}
+
+const foregroundForHex = (hexColor) => (isLightJersey(hexColor) ? '#111827' : '#f8fafc')
+
+const resolveTeamTone = (name, fallback) => {
+  const explicitHex = toHexColor(name)
+  if (explicitHex) {
+    return {
+      jersey: explicitHex,
+      onJersey: foregroundForHex(explicitHex),
+      border: 'rgba(148, 163, 184, 0.48)',
+      aura: 'rgba(148, 163, 184, 0.2)',
+    }
+  }
+
+  const normalizedName = normalizeTeamColorKey(name)
+  const normalizedFallback = normalizeTeamColorKey(fallback)
+
+  const directTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedName)?.[1]
+  if (directTone) return directTone
+
+  const fallbackTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedFallback)?.[1]
+  return fallbackTone || teamPalette.Blanco
+}
+
 const createTeamTone = (name, fallback) => {
-  const tone = teamPalette[name] || teamPalette[fallback]
+  const tone = resolveTeamTone(name, fallback)
+  const darkText = isLightJersey(tone.jersey) || isForcedBlackTextTeam(name)
+  const cardForeground = darkText ? '#111827' : '#f8fafc'
+  const mutedForeground = darkText ? '#334155' : '#cbd5e1'
   return {
     cardStyle: {
       backgroundColor: tone.jersey,
       borderColor: tone.border,
+      color: cardForeground,
       boxShadow: '0 14px 30px rgba(12, 0, 5, 0.22)',
     },
-    titleText: 'text-slate-100',
-    playerText: 'text-slate-100',
-    emptyText: 'text-slate-300',
-    buttonText: 'text-slate-100',
+    titleStyle: { color: cardForeground },
+    playerTextStyle: { color: cardForeground },
+    mutedTextStyle: { color: mutedForeground },
+    buttonTextStyle: { color: cardForeground },
     chipStyle: {
       backgroundColor: tone.jersey,
-      color: tone.onJersey,
+      color: darkText ? '#111827' : tone.onJersey,
       boxShadow: `0 0 0 1px ${tone.border}, 0 0 16px ${tone.aura}`,
     },
     avatarStyle: {
       backgroundColor: tone.jersey,
-      color: tone.onJersey,
+      color: darkText ? '#111827' : tone.onJersey,
       boxShadow: `0 0 0 4px ${tone.aura}, 0 0 0 1px ${tone.border}`,
     },
     auraStyle: {
@@ -585,7 +658,7 @@ const createTeamTone = (name, fallback) => {
       boxShadow: '0 0 0 1px var(--color-border)',
     },
     playerRowStyle: {
-      backgroundColor: 'rgba(0, 0, 0, 0.14)',
+      backgroundColor: darkText ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.14)',
       borderColor: tone.border,
     },
     iconStyle: {
@@ -847,12 +920,33 @@ const cambiarDeEquipo = async (jugadorId, equipoDestino) => {
   }
 }
 
+const construirMensajeBalance = (resultado) => {
+  // Mensaje simple: solo muestra los niveles finales de cada equipo
+  const nivelA = Number(resultado?.nivelTotalEquipoA) || 0
+  const nivelB = Number(resultado?.nivelTotalEquipoB) || 0
+  const balanceado = Boolean(resultado?.balanceadoDespues)
+
+  const estado = balanceado
+    ? 'Equipos equilibrados'
+    : 'Equipos asignados'
+
+  return `${estado}\nEquipo A: ${nivelA} | Equipo B: ${nivelB}`
+}
+
 const balancearAutomaticamente = async () => {
   balanceando.value = true
   try {
-    // Llamar al endpoint de balanceo automático
-    await partidoService.balancearEquiposAutomaticamente(props.partida.id)
+    const resultado = await partidoService.balancearEquiposAutomaticamente(props.partida.id)
     emit('actualizar')
+
+    await uiStore.askConfirm({
+      title: 'Balanceo aplicado',
+      message: construirMensajeBalance(resultado),
+      confirmLabel: 'Entendido',
+      cancelLabel: 'Cerrar',
+      variant: 'info',
+    })
+
     uiStore.showToast({ 
       message: 'Equipos balanceados automáticamente', 
       type: 'success' 

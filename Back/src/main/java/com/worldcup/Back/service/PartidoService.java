@@ -51,6 +51,8 @@ import java.util.stream.Collectors;
 @Service
 public class PartidoService {
 
+    private static final String RATING_SNAPSHOT_VERSION = PartidoRatingEngineService.RATING_SNAPSHOT_VERSION;
+
     private static final Logger logger = LoggerFactory.getLogger(PartidoService.class);
     private static final DateTimeFormatter FORMATO_FECHA_NOTIFICACION = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'a las' HH:mm", new Locale("es", "ES"));
 
@@ -121,6 +123,34 @@ public class PartidoService {
         return (partido.getJugadoresInscritos() != null && partido.getJugadoresInscritos().stream().anyMatch(u -> usuarioId.equals(u.getId())))
                 || (partido.getEquipoA() != null && partido.getEquipoA().stream().anyMatch(u -> usuarioId.equals(u.getId())))
                 || (partido.getEquipoB() != null && partido.getEquipoB().stream().anyMatch(u -> usuarioId.equals(u.getId())));
+    }
+
+    private boolean contieneUsuarioPorId(List<UsuarioEntity> usuarios, Long usuarioId) {
+        if (usuarios == null || usuarioId == null) {
+            return false;
+        }
+        return usuarios.stream().anyMatch(u -> u != null && usuarioId.equals(u.getId()));
+    }
+
+    private void eliminarUsuarioPorId(List<UsuarioEntity> usuarios, Long usuarioId) {
+        if (usuarios == null || usuarioId == null) {
+            return;
+        }
+        usuarios.removeIf(u -> u != null && usuarioId.equals(u.getId()));
+    }
+
+    private void deduplicarPorId(List<UsuarioEntity> usuarios) {
+        if (usuarios == null || usuarios.isEmpty()) {
+            return;
+        }
+        Set<Long> vistos = new HashSet<>();
+        usuarios.removeIf(u -> u == null || u.getId() == null || !vistos.add(u.getId()));
+    }
+
+    private void deduplicarParticipantes(PartidoEntity partido) {
+        deduplicarPorId(partido.getJugadoresInscritos());
+        deduplicarPorId(partido.getEquipoA());
+        deduplicarPorId(partido.getEquipoB());
     }
 
     private void establecerOwnerUnico(PartidoEntity partido, Long ownerUsuarioId) {
@@ -301,12 +331,12 @@ public class PartidoService {
         PartidoEntity partido = partidoRepository.findById(partidoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
 
-        if (!partido.getJugadoresInscritos().contains(owner)
-                && !partido.getEquipoA().contains(owner)
-                && !partido.getEquipoB().contains(owner)) {
+        if (!esParticipante(partido, owner)) {
             partido.getJugadoresInscritos().add(owner);
             partido.setActualizadoEn(LocalDateTime.now());
         }
+
+        deduplicarParticipantes(partido);
 
         return partidoRepository.save(partido);
     }
@@ -336,10 +366,11 @@ public class PartidoService {
     }
 
     @Transactional
-    public PartidoEntity actualizarPartido(Long id, PartidoEntity datosActualizados) {
+    public PartidoEntity actualizarPartido(Long id, PartidoEntity datosActualizados, UsuarioEntity solicitante) {
         Optional<PartidoEntity> partido = partidoRepository.findById(id);
         if (partido.isPresent()) {
             PartidoEntity p = partido.get();
+            validarPermisoOrganizador(p, solicitante, "Solo una persona organizadora puede editar el partido");
             validarPartidoEditable(p);
             if (datosActualizados.getFecha() != null) p.setFecha(datosActualizados.getFecha());
             if (datosActualizados.getLugar() != null) p.setLugar(datosActualizados.getLugar());
@@ -371,10 +402,11 @@ public class PartidoService {
     }
 
     @Transactional
-    public PartidoEntity actualizarEstado(Long id, EstadoPartido estado) {
+    public PartidoEntity actualizarEstado(Long id, EstadoPartido estado, UsuarioEntity solicitante) {
         Optional<PartidoEntity> partido = partidoRepository.findById(id);
         if (partido.isPresent()) {
             PartidoEntity p = partido.get();
+            validarPermisoOrganizador(p, solicitante, "Solo una persona organizadora puede cambiar el estado del partido");
             p.setEstado(estado);
             return partidoRepository.save(p);
         }
@@ -393,18 +425,17 @@ public class PartidoService {
 
     @Transactional
     public PartidoEntity inscribirseAPartido(Long partidoId, UsuarioEntity usuario) {
-        Optional<PartidoEntity> partido = partidoRepository.findById(partidoId);
+        Optional<PartidoEntity> partido = partidoRepository.findByIdForUpdate(partidoId);
         if (partido.isEmpty()) {
             throw new ResourceNotFoundException("Partido", partidoId);
         }
 
         PartidoEntity p = partido.get();
         validarPartidoEditable(p);
+        deduplicarParticipantes(p);
         
         // Verificar si ya está inscrito
-        if (p.getJugadoresInscritos().contains(usuario) || 
-            p.getEquipoA().contains(usuario) || 
-            p.getEquipoB().contains(usuario)) {
+        if (esParticipante(p, usuario)) {
             throw new RuntimeException("Ya estás inscrito en este partido");
         }
 
@@ -431,9 +462,11 @@ public class PartidoService {
 
         PartidoEntity p = partido.get();
         validarPartidoEditable(p);
-        p.getJugadoresInscritos().remove(usuario);
-        p.getEquipoA().remove(usuario);
-        p.getEquipoB().remove(usuario);
+        Long usuarioId = usuario != null ? usuario.getId() : null;
+        eliminarUsuarioPorId(p.getJugadoresInscritos(), usuarioId);
+        eliminarUsuarioPorId(p.getEquipoA(), usuarioId);
+        eliminarUsuarioPorId(p.getEquipoB(), usuarioId);
+        deduplicarParticipantes(p);
         p.setActualizadoEn(LocalDateTime.now());
         partidoRepository.save(p);
     }
@@ -726,19 +759,21 @@ public class PartidoService {
             partido.getJugadoresPorEquipo()
         );
 
-        return new EquiposBalanceadosResponseDTO(
-                partido.getId(),
-                equipoA.totalLevel(),
-                equipoB.totalLevel(),
-            snapshotAntes.diferenciaNivelAbsoluta(),
-            snapshotDespues.diferenciaNivelAbsoluta(),
-            snapshotAntes.balanceado(),
-            snapshotDespues.balanceado(),
-            razonesAntes,
-            cambiosAplicados,
-                equipoA.members().stream().map(this::toJugadorBalanceadoDTO).toList(),
-                equipoB.members().stream().map(this::toJugadorBalanceadoDTO).toList()
-        );
+        // Simple response: only partido ID and final levels; no technical details exposed
+        EquiposBalanceadosResponseDTO response = new EquiposBalanceadosResponseDTO();
+        response.setPartidoId(partido.getId());
+        response.setNivelTotalEquipoA(equipoA.totalLevel());
+        response.setNivelTotalEquipoB(equipoB.totalLevel());
+        response.setBalanceadoDespues(snapshotDespues.balanceado());
+        
+        // Keep deprecated fields for backward compatibility (but they're empty)
+        response.setDiferenciaNivelAntes(snapshotAntes.diferenciaNivelAbsoluta());
+        response.setDiferenciaNivelDespues(snapshotDespues.diferenciaNivelAbsoluta());
+        response.setBalanceadoAntes(snapshotAntes.balanceado());
+        response.setResumenOrganizador(buildResumenOrganizador(snapshotDespues, razonesAntes));
+        response.setMotivoPrincipal(buildMotivoPrincipal(razonesAntes));
+        
+        return response;
     }
 
     @Transactional
@@ -753,7 +788,7 @@ public class PartidoService {
                     partido.getId(),
                     true,
                     false,
-                    partido.getRatingSnapshotVersion() == null ? "trueskill-adapted-v1" : partido.getRatingSnapshotVersion(),
+                    partido.getRatingSnapshotVersion() == null ? RATING_SNAPSHOT_VERSION : partido.getRatingSnapshotVersion(),
                     "YA_PROCESADO",
                     0,
                     0,
@@ -774,7 +809,7 @@ public class PartidoService {
                     partido.getId(),
                     false,
                     false,
-                    "trueskill-adapted-v1",
+                    RATING_SNAPSHOT_VERSION,
                     engineResult.resultadoResolucion(),
                     0,
                     engineResult.votosConsiderados(),
@@ -789,7 +824,7 @@ public class PartidoService {
 
         partido.setRatingProcesado(true);
         partido.setRatingProcesadoEn(LocalDateTime.now());
-        partido.setRatingSnapshotVersion("trueskill-adapted-v1");
+        partido.setRatingSnapshotVersion(RATING_SNAPSHOT_VERSION);
         partido.setActualizadoEn(LocalDateTime.now());
         partidoRepository.save(partido);
 
@@ -797,7 +832,7 @@ public class PartidoService {
                 partido.getId(),
                 false,
                 true,
-                "trueskill-adapted-v1",
+                RATING_SNAPSHOT_VERSION,
                 engineResult.resultadoResolucion(),
                 engineResult.jugadoresActualizados(),
             engineResult.votosConsiderados(),
@@ -806,6 +841,51 @@ public class PartidoService {
                 "Rating procesado correctamente",
                 partido.getRatingProcesadoEn()
         );
+    }
+
+    @Transactional
+    public PartidoEntity actualizarResultadoOficial(Long partidoId, UsuarioEntity solicitante, Integer golesEquipoA, Integer golesEquipoB) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede fijar el resultado oficial");
+
+        if (partido.getEstado() == null || !partido.getEstado().isFinalizado()) {
+            throw new IllegalArgumentException("El resultado oficial solo puede fijarse cuando el partido está finalizado");
+        }
+
+        if (golesEquipoA == null || golesEquipoB == null) {
+            throw new IllegalArgumentException("Debes indicar los goles de ambos equipos");
+        }
+
+        if (golesEquipoA < 0 || golesEquipoB < 0) {
+            throw new IllegalArgumentException("Los goles no pueden ser negativos");
+        }
+
+        partido.setGolesEquipoA(golesEquipoA);
+        partido.setGolesEquipoB(golesEquipoB);
+        if (golesEquipoA > golesEquipoB) {
+            partido.setGanador("EQUIPO_A");
+        } else if (golesEquipoB > golesEquipoA) {
+            partido.setGanador("EQUIPO_B");
+        } else {
+            partido.setGanador("EMPATE");
+        }
+
+        partido.setActualizadoEn(LocalDateTime.now());
+        return partidoRepository.save(partido);
+    }
+
+    // Simple feedback: just state if balanced or not. Opaque strategy: don't expose reasoning.
+    private String buildResumenOrganizador(BalanceSnapshot snapshot, List<String> razones) {
+        return snapshot.balanceado()
+                ? "Equipos equilibrados"
+                : "Equipos asignados";
+    }
+
+    private String buildMotivoPrincipal(List<String> razones) {
+        // No longer expose reasons; keep internals opaque
+        return "";
     }
 
     @Transactional
@@ -1384,9 +1464,9 @@ public class PartidoService {
 
     private PartidoHistorialDTO toHistorialDTO(PartidoEntity partido, UsuarioEntity usuario) {
         DatosHistorialVotacion datosVotacion = resolverDatosHistorialVotacion(partido);
-        Integer golesEquipoA = datosVotacion.golesEquipoA();
-        Integer golesEquipoB = datosVotacion.golesEquipoB();
-        String ganador = datosVotacion.ganador();
+        Integer golesEquipoA = datosVotacion.golesPrincipalEquipoA();
+        Integer golesEquipoB = datosVotacion.golesPrincipalEquipoB();
+        String ganador = datosVotacion.ganadorPrincipal();
         int vecesDiferencial = (int) partidoVotacionRepository.findByPartido(partido)
             .stream()
             .filter(voto -> voto.getJugadoresDiferenciales() != null
@@ -1417,6 +1497,13 @@ public class PartidoService {
                 golesEquipoA,
                 golesEquipoB,
                 ganador,
+                datosVotacion.golesBaseEquipoA(),
+                datosVotacion.golesBaseEquipoB(),
+                datosVotacion.ganadorBase(),
+                datosVotacion.golesConsensuadoEquipoA(),
+                datosVotacion.golesConsensuadoEquipoB(),
+                datosVotacion.ganadorConsensuado(),
+                datosVotacion.mostrarAmbosResultados(),
                 resultado,
                 usuarioEnA,
                 partido.getTipo().toString(),
@@ -1427,27 +1514,47 @@ public class PartidoService {
     }
 
     private DatosHistorialVotacion resolverDatosHistorialVotacion(PartidoEntity partido) {
-        Integer golesA = partido.getGolesEquipoA();
-        Integer golesB = partido.getGolesEquipoB();
-        String ganador = partido.getGanador();
+        Integer golesBaseA = partido.getGolesEquipoA();
+        Integer golesBaseB = partido.getGolesEquipoB();
+        String ganadorBase = partido.getGanador();
+
+        Integer golesConsensuadoA = null;
+        Integer golesConsensuadoB = null;
+        String ganadorConsensuado = null;
 
         List<PartidoVotacionEntity> votos = partidoVotacionRepository.findByPartido(partido);
         if (votos.isEmpty()) {
-            return new DatosHistorialVotacion(golesA, golesB, ganador, null, null);
+            return new DatosHistorialVotacion(
+                    golesBaseA,
+                    golesBaseB,
+                    ganadorBase,
+                    golesBaseA,
+                    golesBaseB,
+                    ganadorBase,
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null
+            );
         }
 
-        if (golesA == null && golesB == null && ganador == null) {
-            golesA = (int) Math.round(votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoAPropuesto).average().orElse(0));
-            golesB = (int) Math.round(votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoBPropuesto).average().orElse(0));
+        golesConsensuadoA = (int) Math.round(votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoAPropuesto).average().orElse(0));
+        golesConsensuadoB = (int) Math.round(votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoBPropuesto).average().orElse(0));
+        ganadorConsensuado = calcularGanadorDesdeMarcador(golesConsensuadoA, golesConsensuadoB);
 
-            if (golesA > golesB) {
-                ganador = "EQUIPO_A";
-            } else if (golesB > golesA) {
-                ganador = "EQUIPO_B";
-            } else {
-                ganador = "EMPATE";
-            }
-        }
+        Integer golesPrincipalA = golesBaseA != null ? golesBaseA : golesConsensuadoA;
+        Integer golesPrincipalB = golesBaseB != null ? golesBaseB : golesConsensuadoB;
+        String ganadorPrincipal = ganadorBase != null ? ganadorBase : ganadorConsensuado;
+
+        boolean existeBase = golesBaseA != null && golesBaseB != null && ganadorBase != null;
+        boolean existeConsensuado = golesConsensuadoA != null && golesConsensuadoB != null && ganadorConsensuado != null;
+        boolean mostrarAmbos = existeBase
+                && existeConsensuado
+                && (!golesBaseA.equals(golesConsensuadoA)
+                || !golesBaseB.equals(golesConsensuadoB)
+                || !ganadorBase.equalsIgnoreCase(ganadorConsensuado));
 
         long votosParejo = votos.stream().filter(v -> Boolean.TRUE.equals(v.getPartidoFueParejo())).count();
         double porcentajeParejo = (votosParejo * 100.0) / votos.size();
@@ -1467,18 +1574,45 @@ public class PartidoService {
                 : intensidadMasVotada.replace('_', ' ');
 
         return new DatosHistorialVotacion(
-                golesA,
-                golesB,
-                ganador,
+                golesPrincipalA,
+                golesPrincipalB,
+                ganadorPrincipal,
+                golesBaseA,
+                golesBaseB,
+                ganadorBase,
+                golesConsensuadoA,
+                golesConsensuadoB,
+                ganadorConsensuado,
+                mostrarAmbos,
                 intensidadLabel,
                 porcentajeParejo
         );
     }
 
+    private String calcularGanadorDesdeMarcador(Integer golesA, Integer golesB) {
+        if (golesA == null || golesB == null) {
+            return null;
+        }
+        if (golesA > golesB) {
+            return "EQUIPO_A";
+        }
+        if (golesB > golesA) {
+            return "EQUIPO_B";
+        }
+        return "EMPATE";
+    }
+
     private record DatosHistorialVotacion(
-            Integer golesEquipoA,
-            Integer golesEquipoB,
-            String ganador,
+            Integer golesPrincipalEquipoA,
+            Integer golesPrincipalEquipoB,
+            String ganadorPrincipal,
+            Integer golesBaseEquipoA,
+            Integer golesBaseEquipoB,
+            String ganadorBase,
+            Integer golesConsensuadoEquipoA,
+            Integer golesConsensuadoEquipoB,
+            String ganadorConsensuado,
+            Boolean mostrarAmbosResultados,
             String intensidadPartido,
             Double porcentajeBalanceo
     ) {
@@ -1634,6 +1768,10 @@ public class PartidoService {
 
     public UsuarioEntity obtenerOwnerDelPartido(PartidoEntity partido) {
         return obtenerOwnerPrincipal(partido);
+    }
+
+    public boolean esOrganizadorPartido(PartidoEntity partido, UsuarioEntity usuario) {
+        return esOrganizador(partido, usuario);
     }
 
     private static class TeamState {

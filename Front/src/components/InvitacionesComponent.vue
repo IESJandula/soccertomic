@@ -193,7 +193,6 @@ const irAPartido = (partidoId) => {
             <div class="flex items-start justify-between gap-2">
               <div>
                 <p class="text-sm font-semibold text-slate-800">{{ solicitud.usuarioA.nombre }}</p>
-                <p class="text-xs text-slate-600">{{ solicitud.usuarioA.email }}</p>
                 <p class="text-xs text-slate-500 mt-1">{{ formatearFecha(solicitud.creadaEn) }}</p>
               </div>
             </div>

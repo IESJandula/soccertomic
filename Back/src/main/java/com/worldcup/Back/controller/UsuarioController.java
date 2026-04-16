@@ -41,10 +41,7 @@ public class UsuarioController {
             @RequestBody(required = false) UsuarioPerfilRequestDTO perfil
     ) {
         String uid = FirebaseRequestContext.requireUid(request);
-        // Use email from request body if provided, otherwise from header
-        String email = (perfil != null && perfil.getEmail() != null) 
-            ? perfil.getEmail() 
-            : FirebaseRequestContext.getEmail(request);
+        String email = FirebaseRequestContext.getEmail(request);
         return ResponseEntity.ok(userService.upsertPerfil(uid, email, perfil));
     }
 
@@ -60,19 +57,13 @@ public class UsuarioController {
     @GetMapping("/me")
     public ResponseEntity<UsuarioResumenDTO> obtenerMiUsuario(HttpServletRequest request) {
         String uid = FirebaseRequestContext.requireUid(request);
-        return ResponseEntity.ok(userService.obtenerResumenPorFirebaseUid(uid));
+        return ResponseEntity.ok(userService.obtenerResumenPorFirebaseUid(uid, FirebaseRequestContext.getEmail(request)));
     }
 
     @GetMapping("/me/votacion-resumen")
     public ResponseEntity<UsuarioVotacionResumenDTO> obtenerMiResumenVotacion(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        return ResponseEntity.ok(partidoVotacionService.obtenerResumenVotacionDeUsuario(usuario.get()));
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
+        return ResponseEntity.ok(partidoVotacionService.obtenerResumenVotacionDeUsuario(usuario));
     }
 
     @GetMapping("/{id}/votacion-resumen-publico")
@@ -80,15 +71,14 @@ public class UsuarioController {
             HttpServletRequest request,
             @PathVariable Long id
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
         Optional<UsuarioEntity> objetivo = userService.buscarPorId(id);
 
-        if (solicitante.isEmpty() || objetivo.isEmpty()) {
+        if (objetivo.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        if (!amistadService.sonAmigos(solicitante.get(), objetivo.get())) {
+        if (!amistadService.sonAmigos(solicitante, objetivo.get())) {
             return ResponseEntity.status(403).build();
         }
 

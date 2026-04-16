@@ -72,7 +72,7 @@
       <!-- Equipo A -->
       <article class="p-3 border-2 space-y-2.5 rounded-lg shadow-sm card-surface" :style="teamAColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-bold flex items-center gap-2 text-slate-100">
+          <h2 class="text-lg font-bold flex items-center gap-2" :style="teamAColor.titleStyle">
             <span class="inline-flex h-7 w-7 items-center justify-center rounded-full" :style="teamAColor.chipStyle">
               <AppIcon name="soccer" :size="12" :style="teamAColor.iconStyle" />
             </span>
@@ -83,7 +83,7 @@
           </span>
         </div>
 
-        <div v-if="!partida.equipoA || partida.equipoA.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
+        <div v-if="!partida.equipoA || partida.equipoA.length === 0" class="text-sm italic p-4 rounded-lg text-center" :style="teamAColor.mutedTextStyle">
           Sin personas asignadas
         </div>
 
@@ -104,7 +104,7 @@
               <AppIcon name="user" :size="14" :style="teamAColor.iconStyle" />
             </div>
             <div>
-              <p class="font-semibold text-sm leading-tight text-slate-100">
+              <p class="font-semibold text-sm leading-tight" :style="teamAColor.playerTextStyle">
                 {{ jugador.nombre }}
                 <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 <span
@@ -117,7 +117,7 @@
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p class="text-[11px] text-slate-300" v-if="jugador.playTendency">
+              <p class="text-[11px]" v-if="jugador.playTendency" :style="teamAColor.mutedTextStyle">
                 Tendencia: {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
@@ -128,7 +128,7 @@
       <!-- Equipo B -->
       <article class="p-3 border-2 space-y-2.5 rounded-lg shadow-sm card-surface" :style="teamBColor.cardStyle">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-bold flex items-center gap-2 text-slate-100">
+          <h2 class="text-lg font-bold flex items-center gap-2" :style="teamBColor.titleStyle">
             <span class="inline-flex h-7 w-7 items-center justify-center rounded-full" :style="teamBColor.chipStyle">
               <AppIcon name="soccer" :size="12" :style="teamBColor.iconStyle" />
             </span>
@@ -139,7 +139,7 @@
           </span>
         </div>
 
-        <div v-if="!partida.equipoB || partida.equipoB.length === 0" class="text-sm italic p-4 rounded-lg text-center text-slate-300">
+        <div v-if="!partida.equipoB || partida.equipoB.length === 0" class="text-sm italic p-4 rounded-lg text-center" :style="teamBColor.mutedTextStyle">
           Sin personas asignadas
         </div>
 
@@ -160,7 +160,7 @@
               <AppIcon name="user" :size="14" :style="teamBColor.iconStyle" />
             </div>
             <div>
-              <p class="font-semibold text-sm leading-tight text-slate-100">
+              <p class="font-semibold text-sm leading-tight" :style="teamBColor.playerTextStyle">
                 {{ jugador.nombre }}
                 <span v-if="String(jugador.id) === String(currentUserId)" class="ml-1.5 text-xs font-bold">(Tú)</span>
                 <span
@@ -173,7 +173,7 @@
                   <span>{{ getRolShortLabel(jugador) }}</span>
                 </span>
               </p>
-              <p class="text-[11px] text-slate-300" v-if="jugador.playTendency">
+              <p class="text-[11px]" v-if="jugador.playTendency" :style="teamBColor.mutedTextStyle">
                 Tendencia: {{ formatTendencia(jugador.playTendency) }}
               </p>
             </div>
@@ -222,17 +222,92 @@ const teamPalette = {
   Morado: { jersey: '#a855f7', onJersey: '#ffffff', border: 'rgba(168, 85, 247, 0.55)', aura: 'rgba(168, 85, 247, 0.18)' },
 }
 
+const normalizeTeamColorKey = (value) => {
+  if (!value) return ''
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+const isForcedBlackTextTeam = (name) => {
+  const normalized = normalizeTeamColorKey(name)
+  return normalized === 'blanco' || normalized === 'amarillo' || normalized === 'white' || normalized === 'yellow'
+}
+
+const rgbStringToHex = (value) => {
+  const match = String(value).match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/i)
+  if (!match) return null
+  const r = Math.max(0, Math.min(255, Number(match[1])))
+  const g = Math.max(0, Math.min(255, Number(match[2])))
+  const b = Math.max(0, Math.min(255, Number(match[3])))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+const toHexColor = (value) => {
+  if (!value) return null
+  const raw = String(value).trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`
+  }
+  return rgbStringToHex(raw)
+}
+
+const isLightJersey = (hexColor) => {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length !== 7) return false
+  const r = parseInt(hexColor.slice(1, 3), 16)
+  const g = parseInt(hexColor.slice(3, 5), 16)
+  const b = parseInt(hexColor.slice(5, 7), 16)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminance >= 0.68
+}
+
+const foregroundForHex = (hexColor) => (isLightJersey(hexColor) ? '#111827' : '#f8fafc')
+
+const resolveTeamTone = (name, fallback) => {
+  const explicitHex = toHexColor(name)
+  if (explicitHex) {
+    return {
+      jersey: explicitHex,
+      onJersey: foregroundForHex(explicitHex),
+      border: 'rgba(148, 163, 184, 0.48)',
+      aura: 'rgba(148, 163, 184, 0.2)',
+    }
+  }
+
+  const normalizedName = normalizeTeamColorKey(name)
+  const normalizedFallback = normalizeTeamColorKey(fallback)
+
+  const directTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedName)?.[1]
+  if (directTone) return directTone
+
+  const fallbackTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedFallback)?.[1]
+  return fallbackTone || teamPalette.Blanco
+}
+
 const createTeamTone = (name, fallback) => {
-  const tone = teamPalette[name] || teamPalette[fallback]
+  const tone = resolveTeamTone(name, fallback)
+  const darkText = isLightJersey(tone.jersey) || isForcedBlackTextTeam(name)
   return {
     cardStyle: {
       backgroundColor: tone.jersey,
       borderColor: tone.border,
+      color: darkText ? '#111827' : '#f8fafc',
       boxShadow: '0 14px 30px rgba(12, 0, 5, 0.22)',
     },
-    titleText: 'text-slate-100',
-    playerText: 'text-slate-100',
-    emptyText: 'text-slate-300',
+    cardForeground: darkText ? '#111827' : '#f8fafc',
+    mutedForeground: darkText ? '#64748b' : '#cbd5e1',
+    titleStyle: {
+      color: darkText ? '#111827' : '#f8fafc',
+    },
+    playerTextStyle: {
+      color: darkText ? '#111827' : '#f8fafc',
+    },
+    mutedTextStyle: {
+      color: darkText ? '#64748b' : '#cbd5e1',
+    },
     chipStyle: {
       backgroundColor: tone.jersey,
       color: tone.onJersey,

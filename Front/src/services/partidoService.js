@@ -123,9 +123,7 @@ class PartidoService {
   }
 
   async balancearEquiposAutomaticamente(partidoId) {
-    const detalle = await this.obtenerDetallePartido(partidoId)
-    const jugadoresIds = detalle.jugadoresInscritos.map(j => j.id)
-    return this.balancearEquipos(partidoId, jugadoresIds)
+    return this.asignarPosiciones(partidoId)
   }
 
   async obtenerAnalisisBalance(partidoId) {
@@ -177,6 +175,14 @@ class PartidoService {
     return apiService.request(`${ENDPOINTS.PARTIDOS}/${partidoId}/rating/procesar`, {
       method: 'POST',
       useCache: false,
+    })
+  }
+
+  async actualizarResultadoOficial(partidoId, golesEquipoA, golesEquipoB) {
+    return apiService.request(ENDPOINTS.PARTIDOS_RESULTADO_OFICIAL(partidoId), {
+      method: 'PUT',
+      useCache: false,
+      body: JSON.stringify({ golesEquipoA, golesEquipoB }),
     })
   }
 }

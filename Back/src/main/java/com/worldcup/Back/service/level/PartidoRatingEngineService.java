@@ -5,6 +5,7 @@ import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.PartidoIncidenciaEntity;
 import com.worldcup.Back.entity.PartidoVotacionEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
+import com.worldcup.Back.entity.enums.TipoIncidenciaPartido;
 import com.worldcup.Back.repository.PartidoIncidenciaRepository;
 import com.worldcup.Back.repository.PartidoVotacionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,15 +21,40 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Rating engine: adapted TrueSkill model with fiability and incident penalties.
+ * 
+ * Data sources used:
+ * - Visible level: from mu/sigma (skill rating)
+ * - Fiability: from user voting history (outlier detection, pattern tracking)
+ * - Incidents: from match logs (validated by organizer)
+ * - Votes: weighted by voter fiability, outliers filtered
+ * - Social signals: from companion ratings (differential votes, companion valuations)
+ * 
+ * Output: mu/sigma updated, fiability adjusted, stats incremented (games, wins, losses, streaks)
+ * 
+ * UX strategy: result is opaque. User sees only "your rating changed by +/- X". Internal logic stays hidden.
+ */
 @Service
 public class PartidoRatingEngineService {
 
+    public static final String RATING_SNAPSHOT_VERSION = "trueskill-adapted-v2-selfinit";
+
+    // TrueSkill parameters: higher mu = stronger player, higher sigma = more uncertainty
     private static final BigDecimal DEFAULT_MU = new BigDecimal("25.00");
     private static final BigDecimal DEFAULT_SIGMA = new BigDecimal("8.33");
     private static final BigDecimal MIN_SIGMA = new BigDecimal("2.00");
     private static final BigDecimal MAX_SIGMA = new BigDecimal("8.33");
     private static final BigDecimal BASE_K = new BigDecimal("2.40");
     private static final BigDecimal SIGMA_DECAY_FACTOR = new BigDecimal("0.95");
+    private static final BigDecimal INCIDENCIA_MUL_SEVERIDAD_1 = new BigDecimal("0.92");
+    private static final BigDecimal INCIDENCIA_MUL_SEVERIDAD_2 = new BigDecimal("0.82");
+    private static final BigDecimal INCIDENCIA_MUL_SEVERIDAD_3 = new BigDecimal("0.70");
+    private static final BigDecimal INCIDENCIA_FIAB_SEVERIDAD_1 = new BigDecimal("-0.03");
+    private static final BigDecimal INCIDENCIA_FIAB_SEVERIDAD_2 = new BigDecimal("-0.06");
+    private static final BigDecimal INCIDENCIA_FIAB_SEVERIDAD_3 = new BigDecimal("-0.10");
+    private static final BigDecimal INCIDENCIA_MUL_MIN = new BigDecimal("0.55");
+    private static final BigDecimal INCIDENCIA_FIAB_MIN = new BigDecimal("-0.20");
 
     @Autowired
     private PartidoVotacionRepository partidoVotacionRepository;
@@ -36,11 +62,28 @@ public class PartidoRatingEngineService {
     @Autowired
     private PartidoIncidenciaRepository partidoIncidenciaRepository;
 
+    /**
+     * Main rating processor: calculates mu/sigma updates for all players after match end.
+     * 
+     * Steps:
+     * 1. Load votes from DB → construct vote snapshots (voter fiability, valuations, differentials)
+     * 2. Filter outliers: votes >1.5 stdev from median are weighted down (anti-fraud)
+     * 3. Resolve result: GANA_A | GANA_B | EMPATE from consensus or organizer override
+     * 4. Calculate expected outcome: TrueSkill expected score based on visible levels
+     * 5. Load context weights: quality, participation, mode, incidents, intensity, equilibrium, score perception
+     * 6. Compute global factor: multiply all context weights
+     * 7. Apply social signals: from companion valuations + differential votes (±0.18 cap)
+     * 8. Calculate incident penalties: organize by player, apply mu multiplier + fiability delta per severity
+     * 9. Update each player: mu ± delta (TrueSkill formula), sigma * decay, fiability adjusted, stats incremented
+     * 10. Return result with outlier count + affected users
+     */
     public EngineResult procesar(PartidoEntity partido) {
+        // Step 1-2: Load and filter votes
         List<PartidoVotacionEntity> votos = partidoVotacionRepository.findByPartido(partido);
         List<VoteSnapshot> snapshots = construirSnapshotsDeVotos(votos);
         OutlierResult outlierResult = filtrarOutliers(snapshots);
 
+        // Step 3: Resolve match outcome from vote consensus
         ResultadoPartido resultado = resolverResultado(partido, outlierResult.votosFiltrados());
         if (resultado == ResultadoPartido.SIN_DATOS) {
             return new EngineResult(resultado.name(), 0, outlierResult.votosFiltrados().size(), outlierResult.votosAtipicos(), outlierResult.usuariosImpactados());
@@ -53,6 +96,7 @@ public class PartidoRatingEngineService {
             return new EngineResult(ResultadoPartido.SIN_EQUIPOS.name(), 0, outlierResult.votosFiltrados().size(), outlierResult.votosAtipicos(), outlierResult.usuariosImpactados());
         }
 
+        // Step 4: Calculate visible levels (mu - 3*sigma) and expected TrueSkill outcome
         BigDecimal nivelVisibleA = sumarNivelVisible(equipoA);
         BigDecimal nivelVisibleB = sumarNivelVisible(equipoB);
 
@@ -67,14 +111,18 @@ public class PartidoRatingEngineService {
         };
         double scoreB = 1.0 - scoreA;
 
+        List<PartidoIncidenciaEntity> incidencias = partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido);
+
+        // Step 5: Load context weights (scale TrueSkill K by quality, participation, mode, etc)
         BigDecimal wCalidad = pesoPorEstadoCalidad(partido.getEstadoCalidad(), partido.getScoreCalidad());
         BigDecimal wParticipacion = calcularPesoParticipacion(partido, outlierResult.votosFiltrados().size());
         BigDecimal wModo = "AUTO".equalsIgnoreCase(partido.getModoEquipos()) ? BigDecimal.ONE : new BigDecimal("0.75");
-        BigDecimal wIncidencias = calcularPesoIncidencias(partido);
+        BigDecimal wIncidencias = calcularPesoIncidencias(incidencias);
         BigDecimal wIntensidad = calcularPesoIntensidadContextual(partido, outlierResult.votosFiltrados(), resultado, expectedA, expectedB);
         BigDecimal wEquilibrio = calcularPesoEquilibrioVotado(outlierResult.votosFiltrados());
         BigDecimal wMarcador = calcularPesoMarcadorPercibido(outlierResult.votosFiltrados());
 
+        // Step 6: Global factor = product of all context weights
         BigDecimal factorGlobal = wCalidad
             .multiply(wParticipacion)
             .multiply(wModo)
@@ -82,18 +130,26 @@ public class PartidoRatingEngineService {
             .multiply(wIntensidad)
             .multiply(wEquilibrio)
             .multiply(wMarcador);
+        
+        // Step 7: Social signals from vote patterns (companion valuations + differentials)
         Map<Long, Double> senialSocial = calcularSenialSocial(partido, outlierResult.votosFiltrados());
+        
+        // Step 8: Group incident penalties by player
+        Map<Long, IncidencePenalty> penalizacionesPorJugador = calcularPenalizacionesPorJugador(incidencias);
 
+        // Step 9: Update each player's rating
         List<UsuarioEntity> actualizados = new ArrayList<>();
         for (UsuarioEntity jugador : equipoA) {
             double social = senialSocial.getOrDefault(jugador.getId(), 0.0d);
-            actualizarJugador(jugador, scoreA, expectedA, factorGlobal, resultado == ResultadoPartido.EMPATE, social);
+            IncidencePenalty penalizacion = penalizacionesPorJugador.getOrDefault(jugador.getId(), IncidencePenalty.NONE);
+            actualizarJugador(jugador, scoreA, expectedA, factorGlobal, resultado == ResultadoPartido.EMPATE, social, penalizacion);
             actualizados.add(jugador);
         }
 
         for (UsuarioEntity jugador : equipoB) {
             double social = senialSocial.getOrDefault(jugador.getId(), 0.0d);
-            actualizarJugador(jugador, scoreB, expectedB, factorGlobal, resultado == ResultadoPartido.EMPATE, social);
+            IncidencePenalty penalizacion = penalizacionesPorJugador.getOrDefault(jugador.getId(), IncidencePenalty.NONE);
+            actualizarJugador(jugador, scoreB, expectedB, factorGlobal, resultado == ResultadoPartido.EMPATE, social, penalizacion);
             actualizados.add(jugador);
         }
 
@@ -123,7 +179,8 @@ public class PartidoRatingEngineService {
                                    double expected,
                                    BigDecimal factorGlobal,
                                    boolean empate,
-                                   double socialSignal) {
+                                   double socialSignal,
+                                   IncidencePenalty penalty) {
         BigDecimal mu = jugador.getRatingMu() == null ? DEFAULT_MU : jugador.getRatingMu();
         BigDecimal sigma = jugador.getRatingSigma() == null ? DEFAULT_SIGMA : jugador.getRatingSigma();
 
@@ -142,6 +199,9 @@ public class PartidoRatingEngineService {
             .setScale(4, RoundingMode.HALF_UP);
 
         BigDecimal deltaFinal = delta.add(deltaSocial).setScale(4, RoundingMode.HALF_UP);
+        if (penalty != null && penalty.ratingMultiplier().compareTo(BigDecimal.ONE) < 0) {
+            deltaFinal = deltaFinal.multiply(penalty.ratingMultiplier()).setScale(4, RoundingMode.HALF_UP);
+        }
 
         BigDecimal nuevoMu = mu.add(deltaFinal).setScale(2, RoundingMode.HALF_UP);
         if (nuevoMu.signum() < 0) {
@@ -160,7 +220,11 @@ public class PartidoRatingEngineService {
 
         jugador.setRatingMu(nuevoMu);
         jugador.setRatingSigma(nuevaSigma);
-        jugador.setRatingVersion("trueskill-adapted-v1");
+        jugador.setRatingVersion(RATING_SNAPSHOT_VERSION);
+
+        if (penalty != null && penalty.fiabilidadDelta().compareTo(BigDecimal.ZERO) < 0) {
+            ajustarFiabilidad(jugador, penalty.fiabilidadDelta().doubleValue());
+        }
 
         jugador.setPartidosJugados((jugador.getPartidosJugados() == null ? 0 : jugador.getPartidosJugados()) + 1);
         if (empate) {
@@ -234,6 +298,7 @@ public class PartidoRatingEngineService {
         return 1.0 / (1.0 + Math.exp(diff / 10.0));
     }
 
+    // Participation weight: lower weight if few people voted (less consensus = less reliable outcome)
     private BigDecimal calcularPesoParticipacion(PartidoEntity partido, int votosValidos) {
         int participantes = Math.max(1, partido.getTotalJugadoresEnEquipos() != null && partido.getTotalJugadoresEnEquipos() > 0
                 ? partido.getTotalJugadoresEnEquipos()
@@ -246,11 +311,10 @@ public class PartidoRatingEngineService {
             participacion = partido.getParticipacionVotacion();
         }
 
-        if (participacion.compareTo(BigDecimal.ZERO) == 0) {
+        // Minimum consensus: below 40% participation is marked as low consensus internally
+        // This keeps the result valid but with reduced weight
+        if (participacion.compareTo(new BigDecimal("0.40")) < 0) {
             return new BigDecimal("0.45");
-        }
-        if (participacion.compareTo(new BigDecimal("0.30")) < 0) {
-            return new BigDecimal("0.50");
         }
         if (participacion.compareTo(new BigDecimal("0.70")) < 0) {
             return new BigDecimal("0.75");
@@ -607,8 +671,7 @@ public class PartidoRatingEngineService {
                 ));
     }
 
-    private BigDecimal calcularPesoIncidencias(PartidoEntity partido) {
-        List<PartidoIncidenciaEntity> incidencias = partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido);
+    private BigDecimal calcularPesoIncidencias(List<PartidoIncidenciaEntity> incidencias) {
         if (incidencias.isEmpty()) {
             return BigDecimal.ONE;
         }
@@ -622,6 +685,81 @@ public class PartidoRatingEngineService {
 
         double factor = 1.0 / (1.0 + (impacto * 0.08));
         return normalizarRango(BigDecimal.valueOf(factor), new BigDecimal("0.50"), BigDecimal.ONE);
+    }
+
+    private Map<Long, IncidencePenalty> calcularPenalizacionesPorJugador(List<PartidoIncidenciaEntity> incidencias) {
+        if (incidencias == null || incidencias.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, IncidencePenaltyAccumulator> acumulado = new HashMap<>();
+        for (PartidoIncidenciaEntity incidencia : incidencias) {
+            if (incidencia == null || !Boolean.TRUE.equals(incidencia.getValidadaPorOrganizador())) {
+                continue;
+            }
+            if (!esIncidenciaPenalizable(incidencia.getTipoIncidencia())) {
+                continue;
+            }
+
+            UsuarioEntity afectado = incidencia.getUsuarioAfectado();
+            if (afectado == null || afectado.getId() == null) {
+                continue;
+            }
+
+            int severidad = normalizarSeveridad(incidencia.getSeveridad());
+            BigDecimal ratingMultiplier = switch (severidad) {
+                case 1 -> INCIDENCIA_MUL_SEVERIDAD_1;
+                case 2 -> INCIDENCIA_MUL_SEVERIDAD_2;
+                default -> INCIDENCIA_MUL_SEVERIDAD_3;
+            };
+            BigDecimal fiabilidadDelta = switch (severidad) {
+                case 1 -> INCIDENCIA_FIAB_SEVERIDAD_1;
+                case 2 -> INCIDENCIA_FIAB_SEVERIDAD_2;
+                default -> INCIDENCIA_FIAB_SEVERIDAD_3;
+            };
+
+            IncidencePenaltyAccumulator bucket = acumulado.computeIfAbsent(afectado.getId(), key -> new IncidencePenaltyAccumulator());
+            bucket.ratingMultiplier = bucket.ratingMultiplier.multiply(ratingMultiplier).setScale(4, RoundingMode.HALF_UP);
+            bucket.fiabilidadDelta = bucket.fiabilidadDelta.add(fiabilidadDelta).setScale(4, RoundingMode.HALF_UP);
+        }
+
+        Map<Long, IncidencePenalty> penalizaciones = new HashMap<>();
+        acumulado.forEach((jugadorId, acc) -> {
+            BigDecimal boundedMultiplier = normalizarRango(acc.ratingMultiplier, INCIDENCIA_MUL_MIN, BigDecimal.ONE).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal boundedFiabilidad = acc.fiabilidadDelta;
+            if (boundedFiabilidad.compareTo(INCIDENCIA_FIAB_MIN) < 0) {
+                boundedFiabilidad = INCIDENCIA_FIAB_MIN;
+            }
+            if (boundedFiabilidad.compareTo(BigDecimal.ZERO) > 0) {
+                boundedFiabilidad = BigDecimal.ZERO;
+            }
+            penalizaciones.put(jugadorId, new IncidencePenalty(boundedMultiplier, boundedFiabilidad.setScale(4, RoundingMode.HALF_UP)));
+        });
+
+        return penalizaciones;
+    }
+
+    private boolean esIncidenciaPenalizable(TipoIncidenciaPartido tipo) {
+        if (tipo == null) {
+            return false;
+        }
+        return switch (tipo) {
+            case ABANDONO, CONDUCTA, AUSENCIA, LESION -> true;
+            default -> false;
+        };
+    }
+
+    private int normalizarSeveridad(Integer severidad) {
+        if (severidad == null) {
+            return 2;
+        }
+        if (severidad < 1) {
+            return 1;
+        }
+        if (severidad > 3) {
+            return 3;
+        }
+        return severidad;
     }
 
     private BigDecimal pesoPorEstadoCalidad(String estadoCalidad, BigDecimal scoreCalidad) {
@@ -657,6 +795,15 @@ public class PartidoRatingEngineService {
     }
 
     private record OutlierResult(List<VoteSnapshot> votosFiltrados, int votosAtipicos, List<UsuarioEntity> usuariosImpactados) {
+    }
+
+    private record IncidencePenalty(BigDecimal ratingMultiplier, BigDecimal fiabilidadDelta) {
+        private static final IncidencePenalty NONE = new IncidencePenalty(BigDecimal.ONE, BigDecimal.ZERO);
+    }
+
+    private static class IncidencePenaltyAccumulator {
+        private BigDecimal ratingMultiplier = BigDecimal.ONE;
+        private BigDecimal fiabilidadDelta = BigDecimal.ZERO;
     }
 
     public record EngineResult(String resultadoResolucion,

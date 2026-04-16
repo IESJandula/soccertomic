@@ -18,6 +18,9 @@ public class ProdFirebaseFailFastConfig {
     @Value("${auth.firebase.project-id:}")
     private String firebaseProjectId;
 
+    @Value("${auth.firebase.credentials-json:}")
+    private String firebaseCredentialsJson;
+
     @Value("${auth.firebase.credentials-path:}")
     private String firebaseCredentialsPath;
 
@@ -36,9 +39,14 @@ public class ProdFirebaseFailFastConfig {
             throw new IllegalStateException("Invalid FIREBASE_PROJECT_ID placeholder. Set a real Firebase project id");
         }
 
+        boolean hasJson = firebaseCredentialsJson != null && !firebaseCredentialsJson.isBlank();
         boolean hasPath = firebaseCredentialsPath != null && !firebaseCredentialsPath.isBlank();
-        if (!hasPath) {
-            throw new IllegalStateException("Missing FIREBASE_CREDENTIALS_PATH");
+        if (!hasJson && !hasPath) {
+            throw new IllegalStateException("Missing AUTH_FIREBASE_CREDENTIALS_JSON or FIREBASE_CREDENTIALS_PATH");
+        }
+
+        if (hasJson) {
+            return;
         }
 
         File credentialsFile = new File(firebaseCredentialsPath);

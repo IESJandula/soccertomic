@@ -32,6 +32,9 @@ public class PartidoDetalleDTO {
     private Boolean estaInscrito;
     private String colorEquipoA;
     private String colorEquipoB;
+    private Integer golesEquipoA;
+    private Integer golesEquipoB;
+    private String ganador;
     private Boolean ratingProcesado;
     private String estadoCalidad;
     private BigDecimal scoreCalidad;

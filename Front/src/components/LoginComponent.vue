@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
-import { loginWithGooglePopup } from '../services/firebaseClient'
+import { loginWithEmailPassword, loginWithGooglePopup, registerWithEmailPassword } from '../services/firebaseClient'
 import BaseButton from './ui/BaseButton.vue'
 import AppIcon from './ui/AppIcon.vue'
 import futbolinLogo from '../assets/FutbolIn_Icono.png'
@@ -13,11 +13,89 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 
 const loading = ref(false)
+const activeAuthMethod = ref('')
+const authMode = ref('login')
+
+const email = ref('')
+const password = ref('')
+const loginError = ref('')
+
+const registerName = ref('')
+const registerEmail = ref('')
+const registerPassword = ref('')
+const registerPasswordConfirm = ref('')
+const registerError = ref('')
+
+const showPassword = ref(false)
+const showRegisterPassword = ref(false)
+const showRegisterPasswordConfirm = ref(false)
+
 const popupNoticeVisible = ref(false)
 let popupReminderTimeoutId = null
 
-const titulo = computed(() => 'Inicia sesión')
-const subtitulo = computed(() => 'Accede de forma segura con tu cuenta de Google.')
+const subtitulo = computed(() => '')
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const validateEmailPasswordForm = () => {
+  const normalizedEmail = String(email.value || '').trim()
+  const normalizedPassword = String(password.value || '')
+
+  if (!normalizedEmail) {
+    return 'El correo es obligatorio.'
+  }
+
+  if (!emailPattern.test(normalizedEmail)) {
+    return 'Introduce un correo válido.'
+  }
+
+  if (!normalizedPassword) {
+    return 'La contraseña es obligatoria.'
+  }
+
+  if (normalizedPassword.length < 6) {
+    return 'La contraseña debe tener al menos 6 caracteres.'
+  }
+
+  return ''
+}
+
+const validateRegisterForm = () => {
+  const normalizedName = String(registerName.value || '').trim()
+  const normalizedEmail = String(registerEmail.value || '').trim()
+  const normalizedPassword = String(registerPassword.value || '')
+  const normalizedConfirm = String(registerPasswordConfirm.value || '')
+
+  if (!normalizedName) {
+    return 'El nombre es obligatorio.'
+  }
+
+  if (normalizedName.length < 2) {
+    return 'El nombre debe tener al menos 2 caracteres.'
+  }
+
+  if (!normalizedEmail) {
+    return 'El correo es obligatorio.'
+  }
+
+  if (!emailPattern.test(normalizedEmail)) {
+    return 'Introduce un correo válido.'
+  }
+
+  if (!normalizedPassword) {
+    return 'La contraseña es obligatoria.'
+  }
+
+  if (normalizedPassword.length < 6) {
+    return 'La contraseña debe tener al menos 6 caracteres.'
+  }
+
+  if (normalizedPassword !== normalizedConfirm) {
+    return 'Las contraseñas no coinciden.'
+  }
+
+  return ''
+}
 
 const parseFirebaseAuthError = (error) => {
   const code = String(error?.code || '')
@@ -36,6 +114,55 @@ const parseFirebaseAuthError = (error) => {
     }
   }
 
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+    return {
+      type: 'error',
+      message: 'Correo o contraseña incorrectos.',
+    }
+  }
+
+  if (code === 'auth/user-not-found') {
+    return {
+      type: 'error',
+      message: 'No existe ninguna cuenta con ese correo.',
+    }
+  }
+
+  if (code === 'auth/invalid-email') {
+    return {
+      type: 'error',
+      message: 'El correo no tiene un formato válido.',
+    }
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return {
+      type: 'warning',
+      message: 'Demasiados intentos seguidos. Espera un momento e inténtalo otra vez.',
+    }
+  }
+
+  if (code === 'auth/email-already-in-use') {
+    return {
+      type: 'error',
+      message: 'Ese correo ya está registrado. Inicia sesión o usa otro correo.',
+    }
+  }
+
+  if (code === 'auth/weak-password') {
+    return {
+      type: 'warning',
+      message: 'La contraseña es demasiado débil. Usa al menos 6 caracteres.',
+    }
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    return {
+      type: 'error',
+      message: 'El proveedor correo/contraseña no está habilitado en Firebase.',
+    }
+  }
+
   return {
     type: 'error',
     message: error?.message || 'No se pudo iniciar sesión con Firebase',
@@ -51,6 +178,9 @@ const clearPopupReminder = () => {
 
 const handleAuth = async () => {
   loading.value = true
+  activeAuthMethod.value = 'google'
+  loginError.value = ''
+  registerError.value = ''
   popupNoticeVisible.value = false
   clearPopupReminder()
 
@@ -68,7 +198,7 @@ const handleAuth = async () => {
       return
     }
 
-    uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success' })
+    uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success', duration: 5000 })
 
     router.push(result.profileCompleted ? '/dashboard/partidos' : '/registro/perfil')
   } catch (error) {
@@ -78,7 +208,87 @@ const handleAuth = async () => {
     clearPopupReminder()
     popupNoticeVisible.value = false
     loading.value = false
+    activeAuthMethod.value = ''
   }
+}
+
+const handleEmailPasswordAuth = async () => {
+  loginError.value = ''
+  registerError.value = ''
+
+  const validationError = validateEmailPasswordForm()
+  if (validationError) {
+    loginError.value = validationError
+    return
+  }
+
+  loading.value = true
+  activeAuthMethod.value = 'password'
+  try {
+    const firebaseSession = await loginWithEmailPassword(email.value.trim(), password.value)
+    const result = await authStore.loginWithFirebaseToken(firebaseSession)
+
+    if (!result.success) {
+      loginError.value = result.message || 'No se pudo completar la acción'
+      uiStore.showToast({ message: loginError.value, type: 'error' })
+      return
+    }
+
+    uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success', duration: 5000 })
+    router.push(result.profileCompleted ? '/dashboard/partidos' : '/registro/perfil')
+  } catch (error) {
+    const feedback = parseFirebaseAuthError(error)
+    loginError.value = feedback.message
+    uiStore.showToast({ message: feedback.message, type: feedback.type })
+  } finally {
+    loading.value = false
+    activeAuthMethod.value = ''
+  }
+}
+
+const handleRegisterEmailPassword = async () => {
+  registerError.value = ''
+  loginError.value = ''
+
+  const validationError = validateRegisterForm()
+  if (validationError) {
+    registerError.value = validationError
+    return
+  }
+
+  loading.value = true
+  activeAuthMethod.value = 'register'
+  try {
+    const firebaseSession = await registerWithEmailPassword({
+      email: registerEmail.value.trim(),
+      password: registerPassword.value,
+      displayName: registerName.value.trim(),
+    })
+
+    const result = await authStore.loginWithFirebaseToken(firebaseSession)
+
+    if (!result.success) {
+      registerError.value = result.message || 'No se pudo crear la cuenta'
+      uiStore.showToast({ message: registerError.value, type: 'error' })
+      return
+    }
+
+    uiStore.showToast({ message: 'Cuenta creada correctamente', type: 'login-success' })
+    router.push('/registro/perfil')
+  } catch (error) {
+    const feedback = parseFirebaseAuthError(error)
+    registerError.value = feedback.message
+    uiStore.showToast({ message: feedback.message, type: feedback.type })
+  } finally {
+    loading.value = false
+    activeAuthMethod.value = ''
+  }
+}
+
+const switchAuthMode = (mode) => {
+  authMode.value = mode
+  loginError.value = ''
+  registerError.value = ''
 }
 </script>
 
@@ -113,29 +323,163 @@ const handleAuth = async () => {
               <p class="text-[11px] text-slate-300 mt-1">Cortita y al pie, organiza tu partido en segundos</p>
             </div>
           </div>
-          <p class="text-slate-200 text-sm mt-1">{{ titulo }}</p>
           <p class="text-slate-300 text-xs mt-1">{{ subtitulo }}</p>
         </div>
 
-        <form class="space-y-4" @submit.prevent="handleAuth">
-          <BaseButton block variant="primary" :loading="loading" :disabled="loading" type="submit">
-            Continuar con Google
-          </BaseButton>
-          <p v-if="loading" class="text-xs text-slate-300 text-center">
-            Esperando confirmacion de Google en la ventana emergente...
-          </p>
-          <p v-if="loading && popupNoticeVisible" class="text-xs text-[color:var(--color-secondary)] text-center">
-            El popup de Google ya se ha abierto. Completa la autorizacion en esa ventana para continuar.
-          </p>
-        </form>
+        <div class="space-y-6">
+          <div class="grid grid-cols-2 gap-2 bg-slate-900/60 border border-slate-700 rounded-xl p-1">
+            <button
+              type="button"
+              class="h-10 rounded-lg text-sm font-semibold transition"
+              :class="authMode === 'login' ? 'bg-[color:var(--color-secondary)] text-black' : 'text-slate-300 hover:bg-slate-800'"
+              @click="switchAuthMode('login')"
+            >
+              Iniciar sesión
+            </button>
+            <button
+              type="button"
+              class="h-10 rounded-lg text-sm font-semibold transition"
+              :class="authMode === 'register' ? 'bg-[color:var(--color-secondary)] text-black' : 'text-slate-300 hover:bg-slate-800'"
+              @click="switchAuthMode('register')"
+            >
+              Crear cuenta
+            </button>
+          </div>
 
-        <div class="mt-8 bg-[color:rgba(151,240,125,0.14)] border border-[color:rgba(151,240,125,0.34)] rounded-xl px-4 py-3">
-          <p class="text-xs font-semibold text-[color:var(--color-secondary)] inline-flex items-center gap-1.5">
-            <AppIcon name="check" :size="14" />
-            Acceso seguro
-          </p>
-          <p class="text-xs text-slate-200 mt-1">La autenticación se gestiona con Google mediante Firebase.</p>
+          <form v-if="authMode === 'login'" class="space-y-3" @submit.prevent="handleEmailPasswordAuth">
+            <div class="space-y-3">
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Correo</span>
+                <input
+                  v-model.trim="email"
+                  type="email"
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="tu@correo.com"
+                  class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                />
+              </label>
+
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Contraseña</span>
+                <div class="relative">
+                  <input
+                    v-model="password"
+                    :type="showPassword ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    placeholder="Tu contraseña"
+                    class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 pr-12 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 w-11 inline-flex items-center justify-center text-slate-300 hover:text-slate-100"
+                    :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    @click="showPassword = !showPassword"
+                  >
+                    <AppIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="18" />
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <p v-if="loginError" class="text-xs text-rose-300 font-medium">{{ loginError }}</p>
+
+            <BaseButton block variant="primary" :loading="loading && activeAuthMethod === 'password'" :disabled="loading" type="submit">
+              Entrar con correo y contraseña
+            </BaseButton>
+          </form>
+
+          <form v-else class="space-y-3" @submit.prevent="handleRegisterEmailPassword">
+            <div class="space-y-3">
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Nombre</span>
+                <input
+                  v-model.trim="registerName"
+                  type="text"
+                  autocomplete="name"
+                  placeholder="Tu nombre"
+                  class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                />
+              </label>
+
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Correo</span>
+                <input
+                  v-model.trim="registerEmail"
+                  type="email"
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="tu@correo.com"
+                  class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                />
+              </label>
+
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Contraseña</span>
+                <div class="relative">
+                  <input
+                    v-model="registerPassword"
+                    :type="showRegisterPassword ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    placeholder="Mínimo 6 caracteres"
+                    class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 pr-12 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 w-11 inline-flex items-center justify-center text-slate-300 hover:text-slate-100"
+                    :aria-label="showRegisterPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    @click="showRegisterPassword = !showRegisterPassword"
+                  >
+                    <AppIcon :name="showRegisterPassword ? 'eyeOff' : 'eye'" :size="18" />
+                  </button>
+                </div>
+              </label>
+
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Confirmar contraseña</span>
+                <div class="relative">
+                  <input
+                    v-model="registerPasswordConfirm"
+                    :type="showRegisterPasswordConfirm ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    placeholder="Repite la contraseña"
+                    class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 pr-12 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 w-11 inline-flex items-center justify-center text-slate-300 hover:text-slate-100"
+                    :aria-label="showRegisterPasswordConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    @click="showRegisterPasswordConfirm = !showRegisterPasswordConfirm"
+                  >
+                    <AppIcon :name="showRegisterPasswordConfirm ? 'eyeOff' : 'eye'" :size="18" />
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <p v-if="registerError" class="text-xs text-rose-300 font-medium">{{ registerError }}</p>
+
+            <BaseButton block variant="primary" :loading="loading && activeAuthMethod === 'register'" :disabled="loading" type="submit">
+              Crear cuenta
+            </BaseButton>
+          </form>
+
+          <div class="flex items-center gap-3 text-xs text-slate-400">
+            <span class="h-px flex-1 bg-slate-700"></span>
+            <span>o</span>
+            <span class="h-px flex-1 bg-slate-700"></span>
+          </div>
+
+          <form class="space-y-4" @submit.prevent="handleAuth">
+            <BaseButton block variant="secondary" :loading="loading && activeAuthMethod === 'google'" :disabled="loading" type="submit">
+              Continuar con Google
+            </BaseButton>
+            <p v-if="loading && activeAuthMethod === 'google'" class="text-xs text-slate-300 text-center">
+              {{ popupNoticeVisible ? 'El popup de Google ya se ha abierto. Completa la autorizacion en esa ventana para continuar.' : 'Esperando confirmacion de Google en la ventana emergente...' }}
+            </p>
+          </form>
         </div>
+
       </div>
 
       <p class="text-center text-slate-400 mt-4 text-xs">© 2026 FUTBOLIN</p>

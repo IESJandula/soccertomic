@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -59,6 +60,29 @@ public class GlobalExceptionHandler {
         body.put("path", request.getDescription(false).replace("uri=", ""));
 
         return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Object> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex, WebRequest request) {
+        String path = request.getDescription(false).replace("uri=", "");
+        String message = "JSON invalido o cuerpo mal formado";
+
+        String rawError = ex.getMessage();
+        if (rawError != null && rawError.contains("START_ARRAY")) {
+            message = "Formato JSON invalido: se esperaba un objeto JSON y se recibio un array";
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("message", message);
+        body.put("path", path);
+
+        LOGGER.warn("Malformed JSON for {}: {}", path, rawError);
+
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

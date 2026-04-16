@@ -2,8 +2,10 @@ package com.worldcup.Back.service.level;
 
 import com.worldcup.Back.entity.PartidoCompaneroValoradoEmbeddable;
 import com.worldcup.Back.entity.PartidoEntity;
+import com.worldcup.Back.entity.PartidoIncidenciaEntity;
 import com.worldcup.Back.entity.PartidoVotacionEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
+import com.worldcup.Back.entity.enums.TipoIncidenciaPartido;
 import com.worldcup.Back.repository.PartidoIncidenciaRepository;
 import com.worldcup.Back.repository.PartidoVotacionRepository;
 import org.junit.jupiter.api.Test;
@@ -112,6 +114,39 @@ class PartidoRatingEngineServiceTests {
         assertEquals(new BigDecimal("25.00"), equipoB.getRatingMu());
         assertEquals(1, result.votosConsiderados());
         assertEquals(0, result.votosAtipicos());
+    }
+
+    @Test
+    void procesar_aplicaPenalizacionMediaPorIncidenciaGraveAlJugadorAfectado() {
+        UsuarioEntity equipoA = jugador(1L, "Equipo A", null);
+        UsuarioEntity equipoB = jugador(2L, "Equipo B", null);
+        equipoA.setRatingMu(new BigDecimal("25.00"));
+        equipoB.setRatingMu(new BigDecimal("25.00"));
+        equipoA.setFiabilidadScore(new BigDecimal("1.00"));
+
+        UsuarioEntity votante = jugador(10L, "Votante", new BigDecimal("80.00"));
+
+        PartidoEntity partido = partidoBase(List.of(equipoA), List.of(equipoB));
+
+        PartidoCompaneroValoradoEmbeddable actitudPositiva = new PartidoCompaneroValoradoEmbeddable(1L, 1);
+        PartidoVotacionEntity voto = voto(partido, votante, 1, 1, List.of(1L), List.of(actitudPositiva));
+
+        PartidoIncidenciaEntity incidencia = new PartidoIncidenciaEntity();
+        incidencia.setPartido(partido);
+        incidencia.setUsuarioAfectado(equipoA);
+        incidencia.setTipoIncidencia(TipoIncidenciaPartido.ABANDONO);
+        incidencia.setSeveridad(3);
+        incidencia.setValidadaPorOrganizador(true);
+
+        when(partidoVotacionRepository.findByPartido(partido)).thenReturn(List.of(voto));
+        when(partidoIncidenciaRepository.findByPartidoOrderByCreadaEnDesc(partido)).thenReturn(List.of(incidencia));
+
+        PartidoRatingEngineService.EngineResult result = partidoRatingEngineService.procesar(partido);
+
+        assertEquals("EMPATE", result.resultadoResolucion());
+        assertEquals(new BigDecimal("25.01"), equipoA.getRatingMu());
+        assertEquals(new BigDecimal("0.90"), equipoA.getFiabilidadScore());
+        assertEquals(new BigDecimal("25.00"), equipoB.getRatingMu());
     }
 
     private PartidoEntity partidoBase(List<UsuarioEntity> equipoA, List<UsuarioEntity> equipoB) {

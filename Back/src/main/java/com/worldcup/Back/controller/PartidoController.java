@@ -3,6 +3,7 @@ package com.worldcup.Back.controller;
 import com.worldcup.Back.dto.request.BalanceTeamsRequestDTO;
 import com.worldcup.Back.dto.request.PartidoIncidenciaRequestDTO;
 import com.worldcup.Back.dto.request.PartidoRequestDTO;
+import com.worldcup.Back.dto.request.PartidoResultadoOficialRequestDTO;
 import com.worldcup.Back.dto.response.EquiposBalanceadosResponseDTO;
 import com.worldcup.Back.dto.response.PartidoBalanceAnalisisResponseDTO;
 import com.worldcup.Back.dto.response.PartidoResponseDTO;
@@ -17,7 +18,7 @@ import com.worldcup.Back.entity.PartidoOrganizadorEntity;
 import com.worldcup.Back.entity.EquipoRapidoEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.EstadoPartido;
-import com.worldcup.Back.security.FirebaseRequestContext;
+import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.service.AmistadService;
 import com.worldcup.Back.service.EquipoRapidoService;
 import com.worldcup.Back.service.InvitacionService;
@@ -132,6 +133,9 @@ public class PartidoController {
                 estaInscrito,
                 normalizeTeamColor(partido.getColorEquipoA(), "Blanco"),
                 normalizeTeamColor(partido.getColorEquipoB(), "Negro"),
+                partido.getGolesEquipoA(),
+                partido.getGolesEquipoB(),
+                partido.getGanador(),
                 partido.getRatingProcesado(),
                 partido.getEstadoCalidad(),
                 partido.getScoreCalidad(),
@@ -147,12 +151,7 @@ public class PartidoController {
             HttpServletRequest request,
             @RequestBody PartidoRequestDTO dto
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creador = userService.buscarPorFirebaseUid(uid);
-        
-        if (creador.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creador = userService.obtenerOCrearDesdeRequest(request);
 
         PartidoEntity partido = new PartidoEntity();
         partido.setFecha(dto.getFecha());
@@ -169,31 +168,31 @@ public class PartidoController {
         partido.setColorEquipoA(normalizeTeamColor(dto.getColorEquipoA(), "Blanco"));
         partido.setColorEquipoB(normalizeTeamColor(dto.getColorEquipoB(), "Negro"));
         
-        PartidoEntity creado = partidoService.crearPartido(partido, creador.get());
-        creado = partidoService.inscribirOwnerInicial(creado.getId(), creador.get());
+        PartidoEntity creado = partidoService.crearPartido(partido, creador);
+        creado = partidoService.inscribirOwnerInicial(creado.getId(), creador);
 
         if (dto.getConvocarEquipoRapidoId() != null) {
             String equipoDestino = "B".equalsIgnoreCase(dto.getEquipoDestinoConvocado()) ? "B" : "A";
-            EquipoRapidoEntity equipoRapido = equipoRapidoService.obtenerEquipoRapidoPropio(creador.get(), dto.getConvocarEquipoRapidoId());
+            EquipoRapidoEntity equipoRapido = equipoRapidoService.obtenerEquipoRapidoPropio(creador, dto.getConvocarEquipoRapidoId());
 
             int integrantesConvocados = 1 + equipoRapido.getMiembros().size();
             if (integrantesConvocados > creado.getJugadoresPorEquipo()) {
                 return ResponseEntity.badRequest().build();
             }
 
-            creado = partidoService.asignarJugadorAEquipo(creado.getId(), creador.get().getId(), equipoDestino, creador.get());
+            creado = partidoService.asignarJugadorAEquipo(creado.getId(), creador.getId(), equipoDestino, creador);
 
             for (UsuarioEntity miembro : equipoRapido.getMiembros()) {
-                if (miembro.getId().equals(creador.get().getId())) {
+                if (miembro.getId().equals(creador.getId())) {
                     continue;
                 }
                 partidoService.inscribirseAPartido(creado.getId(), miembro);
-                creado = partidoService.asignarJugadorAEquipo(creado.getId(), miembro.getId(), equipoDestino, creador.get());
+                creado = partidoService.asignarJugadorAEquipo(creado.getId(), miembro.getId(), equipoDestino, creador);
                 invitacionService.crearNotificacionConvocatoriaEquipo(
                         creado,
                         miembro,
                         equipoRapido.getNombre(),
-                        creador.get().getNombre(),
+                        creador.getNombre(),
                         equipoDestino
                 );
             }
@@ -211,14 +210,9 @@ public class PartidoController {
 
     @GetMapping("/mis-partidos")
     public ResponseEntity<List<PartidoResponseDTO>> obtenerMisPartidos(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-        
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
-        List<PartidoEntity> partidos = partidoService.obtenerPartidosInscritos(usuario.get());
+        List<PartidoEntity> partidos = partidoService.obtenerPartidosInscritos(usuario);
         List<PartidoResponseDTO> dtos = partidos.stream()
                 .map(this::entityToDTO)
                 .collect(Collectors.toList());
@@ -227,14 +221,8 @@ public class PartidoController {
 
     @GetMapping("/mi-historial")
     public ResponseEntity<List<PartidoHistorialDTO>> obtenerMiHistorial(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        return ResponseEntity.ok(partidoService.obtenerHistorialPartidosFinalizados(usuario.get()));
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
+        return ResponseEntity.ok(partidoService.obtenerHistorialPartidosFinalizados(usuario));
     }
 
     @GetMapping("/historial/public/{usuarioId}")
@@ -242,16 +230,14 @@ public class PartidoController {
             HttpServletRequest request,
             @PathVariable Long usuarioId
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
         Optional<UsuarioEntity> objetivo = userService.buscarPorId(usuarioId);
 
-        if (solicitante.isEmpty() || objetivo.isEmpty()) {
+        if (objetivo.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        if (!amistadService.sonAmigos(solicitante.get(), objetivo.get())) {
+        if (!amistadService.sonAmigos(solicitante, objetivo.get())) {
             return ResponseEntity.status(403).build();
         }
 
@@ -270,8 +256,11 @@ public class PartidoController {
     @PutMapping("/{id}")
     public ResponseEntity<PartidoResponseDTO> actualizarPartido(
             @PathVariable Long id,
+            HttpServletRequest request,
             @RequestBody PartidoRequestDTO dto
     ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
         try {
             PartidoEntity datosActualizados = new PartidoEntity();
             datosActualizados.setFecha(dto.getFecha());
@@ -280,10 +269,12 @@ public class PartidoController {
             datosActualizados.setDuracionMinutos(dto.getDuracionMinutos());
             datosActualizados.setModoEquipos(normalizeModoEquipos(dto.getModoEquipos()));
             
-            PartidoEntity actualizado = partidoService.actualizarPartido(id, datosActualizados);
+            PartidoEntity actualizado = partidoService.actualizarPartido(id, datosActualizados, solicitante);
             return ResponseEntity.ok(entityToDTO(actualizado));
-        } catch (RuntimeException e) {
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).build();
         }
     }
 
@@ -293,15 +284,10 @@ public class PartidoController {
             @RequestParam String tipo,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoEntity actualizado = partidoService.cambiarATipo(id, tipo, solicitante.get());
+            PartidoEntity actualizado = partidoService.cambiarATipo(id, tipo, solicitante);
             return ResponseEntity.ok(entityToDTO(actualizado));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -311,13 +297,18 @@ public class PartidoController {
     @PutMapping("/{id}/estado")
     public ResponseEntity<PartidoResponseDTO> cambiarEstadoPartido(
             @PathVariable Long id,
-            @RequestParam EstadoPartido estado
+            @RequestParam EstadoPartido estado,
+            HttpServletRequest request
     ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
         try {
-            PartidoEntity actualizado = partidoService.actualizarEstado(id, estado);
+            PartidoEntity actualizado = partidoService.actualizarEstado(id, estado, solicitante);
             return ResponseEntity.ok(entityToDTO(actualizado));
-        } catch (RuntimeException e) {
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).build();
         }
     }
 
@@ -338,8 +329,7 @@ public class PartidoController {
         }
 
         PartidoEntity p = partido.get();
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuarioActual = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity usuarioActual = userService.obtenerOCrearDesdeRequest(request);
 
         // Inicializar colecciones si son null (para partidos antiguos)
         if (p.getJugadoresInscritos() == null) {
@@ -352,7 +342,7 @@ public class PartidoController {
             p.setEquipoB(new ArrayList<>());
         }
 
-        PartidoDetalleDTO detalle = entityToDetalleDTO(p, usuarioActual.orElse(null));
+        PartidoDetalleDTO detalle = entityToDetalleDTO(p, usuarioActual);
 
         return ResponseEntity.ok(detalle);
     }
@@ -362,17 +352,12 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoEntity actualizado = partidoService.inscribirseAPartido(id, usuario.get());
+            PartidoEntity actualizado = partidoService.inscribirseAPartido(id, usuario);
             // Retornar el detalle actualizado
-            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, usuario.get());
+            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, usuario);
             return ResponseEntity.ok(detalle);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -384,22 +369,17 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            partidoService.desinscribirseDePartido(id, usuario.get());
+            partidoService.desinscribirseDePartido(id, usuario);
             Optional<PartidoEntity> actualizado = partidoService.obtenerPorId(id);
             if (actualizado.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
 
             PartidoEntity p = actualizado.get();
-            PartidoDetalleDTO detalle = entityToDetalleDTO(p, usuario.get());
+            PartidoDetalleDTO detalle = entityToDetalleDTO(p, usuario);
             return ResponseEntity.ok(detalle);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -413,12 +393,7 @@ public class PartidoController {
             @RequestParam String equipo,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creador = userService.buscarPorFirebaseUid(uid);
-        
-        if (creador.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creador = userService.obtenerOCrearDesdeRequest(request);
         
         Optional<PartidoEntity> partido = partidoService.obtenerPorId(id);
 
@@ -427,8 +402,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.asignarJugadorAEquipo(id, usuarioId, equipo, creador.get());
-            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador.get());
+            PartidoEntity actualizado = partidoService.asignarJugadorAEquipo(id, usuarioId, equipo, creador);
+            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador);
             return ResponseEntity.ok(detalle);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -441,12 +416,7 @@ public class PartidoController {
             @PathVariable Long usuarioId,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creador = userService.buscarPorFirebaseUid(uid);
-        
-        if (creador.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creador = userService.obtenerOCrearDesdeRequest(request);
         
         Optional<PartidoEntity> partido = partidoService.obtenerPorId(id);
 
@@ -455,8 +425,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.moverJugadorASinEquipo(id, usuarioId, creador.get());
-            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador.get());
+            PartidoEntity actualizado = partidoService.moverJugadorASinEquipo(id, usuarioId, creador);
+            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador);
             return ResponseEntity.ok(detalle);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -470,12 +440,7 @@ public class PartidoController {
             @RequestParam String equipoDestino,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creador = userService.buscarPorFirebaseUid(uid);
-        
-        if (creador.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creador = userService.obtenerOCrearDesdeRequest(request);
         
         Optional<PartidoEntity> partido = partidoService.obtenerPorId(id);
 
@@ -484,8 +449,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.moverJugador(id, usuarioId, equipoDestino, creador.get());
-            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador.get());
+            PartidoEntity actualizado = partidoService.moverJugador(id, usuarioId, equipoDestino, creador);
+            PartidoDetalleDTO detalle = entityToDetalleDTO(actualizado, creador);
             return ResponseEntity.ok(detalle);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -497,15 +462,10 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creador = userService.buscarPorFirebaseUid(uid);
-
-        if (creador.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creador = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            partidoService.eliminarPartido(id, creador.get());
+            partidoService.eliminarPartido(id, creador);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -518,15 +478,10 @@ public class PartidoController {
             HttpServletRequest request,
             @Valid @RequestBody BalanceTeamsRequestDTO body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            EquiposBalanceadosResponseDTO response = partidoService.balancearEquipos(id, body.getPlayerIds(), usuario.get());
+            EquiposBalanceadosResponseDTO response = partidoService.balancearEquipos(id, body.getPlayerIds(), usuario);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
@@ -550,14 +505,10 @@ public class PartidoController {
             HttpServletRequest request,
             @Valid @RequestBody PartidoIncidenciaRequestDTO body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoIncidenciaResponseDTO response = partidoService.registrarIncidencia(id, solicitante.get(), body);
+            PartidoIncidenciaResponseDTO response = partidoService.registrarIncidencia(id, solicitante, body);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -571,14 +522,10 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            List<PartidoIncidenciaResponseDTO> response = partidoService.obtenerIncidencias(id, solicitante.get());
+            List<PartidoIncidenciaResponseDTO> response = partidoService.obtenerIncidencias(id, solicitante);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
@@ -590,14 +537,10 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoIncidenciaResumenDTO response = partidoService.obtenerResumenIncidencias(id, solicitante.get());
+            PartidoIncidenciaResumenDTO response = partidoService.obtenerResumenIncidencias(id, solicitante);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
@@ -609,15 +552,34 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoRatingProcesoResponseDTO response = partidoService.procesarRatingPartido(id, solicitante.get());
+            PartidoRatingProcesoResponseDTO response = partidoService.procesarRatingPartido(id, solicitante);
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/resultado-oficial")
+    public ResponseEntity<?> actualizarResultadoOficial(
+            @PathVariable Long id,
+            HttpServletRequest request,
+            @Valid @RequestBody PartidoResultadoOficialRequestDTO body
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
+        try {
+            PartidoEntity actualizado = partidoService.actualizarResultadoOficial(
+                    id,
+                    solicitante,
+                    body.getGolesEquipoA(),
+                    body.getGolesEquipoB()
+            );
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (RuntimeException e) {
@@ -631,12 +593,7 @@ public class PartidoController {
             HttpServletRequest request,
             @RequestBody Map<String, Long> body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> creadorActual = userService.buscarPorFirebaseUid(uid);
-        
-        if (creadorActual.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity creadorActual = userService.obtenerOCrearDesdeRequest(request);
 
         Long nuevoCreadorId = body.get("nuevoCreadorId");
         if (nuevoCreadorId == null) {
@@ -644,8 +601,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.transferirCreador(id, creadorActual.get(), nuevoCreadorId);
-            return ResponseEntity.ok(entityToDetalleDTO(actualizado, creadorActual.get()));
+            PartidoEntity actualizado = partidoService.transferirCreador(id, creadorActual, nuevoCreadorId);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, creadorActual));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -657,11 +614,7 @@ public class PartidoController {
             HttpServletRequest request,
             @RequestBody Map<String, Long> body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         Long usuarioId = body.get("usuarioId");
         if (usuarioId == null) {
@@ -669,8 +622,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.asignarCoOrganizador(id, solicitante.get(), usuarioId);
-            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante.get()));
+            PartidoEntity actualizado = partidoService.asignarCoOrganizador(id, solicitante, usuarioId);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -682,15 +635,11 @@ public class PartidoController {
             @PathVariable Long usuarioId,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            PartidoEntity actualizado = partidoService.revocarOrganizador(id, solicitante.get(), usuarioId);
-            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante.get()));
+            PartidoEntity actualizado = partidoService.revocarOrganizador(id, solicitante, usuarioId);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -702,11 +651,7 @@ public class PartidoController {
             HttpServletRequest request,
             @RequestBody(required = false) Map<String, Object> body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         boolean confirmarEliminacion = body != null && Boolean.TRUE.equals(body.get("confirmarEliminacion"));
         Long nuevoOwnerId = null;
@@ -718,8 +663,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.salirComoOrganizador(id, solicitante.get(), confirmarEliminacion, nuevoOwnerId);
-            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante.get()));
+            PartidoEntity actualizado = partidoService.salirComoOrganizador(id, solicitante, confirmarEliminacion, nuevoOwnerId);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
@@ -731,11 +676,7 @@ public class PartidoController {
             HttpServletRequest request,
             @RequestBody(required = false) Map<String, Object> body
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         BigDecimal precioPista = null;
         if (body != null && body.get("precioPista") != null) {
@@ -752,8 +693,8 @@ public class PartidoController {
         }
 
         try {
-            PartidoEntity actualizado = partidoService.reservarPista(id, solicitante.get(), precioPista);
-            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante.get()));
+            PartidoEntity actualizado = partidoService.reservarPista(id, solicitante, precioPista);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
@@ -764,14 +705,10 @@ public class PartidoController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> solicitante = userService.buscarPorFirebaseUid(uid);
-        if (solicitante.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            return ResponseEntity.ok(partidoService.obtenerEstadoPagoReserva(id, solicitante.get()));
+            return ResponseEntity.ok(partidoService.obtenerEstadoPagoReserva(id, solicitante));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

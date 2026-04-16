@@ -41,6 +41,8 @@ const mensajeProcesoRating = ref('')
 const ultimaEjecucionRating = ref(null)
 const companerosAsignados = ref([])
 const mensajeVotacion = ref('')
+const mostrarModalDiscusionResultado = ref(false)
+const guardandoResultadoOficial = ref(false)
 const enviandoSolicitudA = ref(null)
 const solicitudesEnviadas = ref([])
 const amigosActuales = ref([])
@@ -55,6 +57,30 @@ const votacionForm = ref({
   valoracionesCompaneros: [],
 })
 
+const resultadoOficialForm = ref({
+  golesEquipoA: 0,
+  golesEquipoB: 0,
+})
+
+const resetVotacionForm = () => {
+  votacionForm.value = {
+    golesEquipoAPropuesto: 0,
+    golesEquipoBPropuesto: 0,
+    intensidadPartido: 'MEDIO',
+    partidoFueParejo: true,
+    partidoAlterado: false,
+    jugadoresDiferenciales: [],
+    valoracionesCompaneros: [],
+  }
+}
+
+const sincronizarResultadoOficialForm = () => {
+  resultadoOficialForm.value = {
+    golesEquipoA: Number(partido.value?.golesEquipoA) || 0,
+    golesEquipoB: Number(partido.value?.golesEquipoB) || 0,
+  }
+}
+
 const teamPalette = {
   Blanco: { jersey: '#ffffff', onJersey: '#111827', border: 'rgba(255, 255, 255, 0.62)' },
   Negro: { jersey: '#050505', onJersey: '#f8fafc', border: 'rgba(255, 255, 255, 0.24)' },
@@ -66,28 +92,95 @@ const teamPalette = {
   Morado: { jersey: '#a855f7', onJersey: '#ffffff', border: 'rgba(168, 85, 247, 0.58)' },
 }
 
+const normalizeTeamColorKey = (value) => {
+  if (!value) return ''
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+const rgbStringToHex = (value) => {
+  const match = String(value).match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/i)
+  if (!match) return null
+  const r = Math.max(0, Math.min(255, Number(match[1])))
+  const g = Math.max(0, Math.min(255, Number(match[2])))
+  const b = Math.max(0, Math.min(255, Number(match[3])))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+const toHexColor = (value) => {
+  if (!value) return null
+  const raw = String(value).trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`
+  }
+  return rgbStringToHex(raw)
+}
+
+const foregroundForHex = (hexColor) => {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length !== 7) return '#111827'
+  const r = parseInt(hexColor.slice(1, 3), 16)
+  const g = parseInt(hexColor.slice(3, 5), 16)
+  const b = parseInt(hexColor.slice(5, 7), 16)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminance >= 0.68 ? '#111827' : '#f8fafc'
+}
+
+const resolveTeamTone = (name, fallback) => {
+  const explicitHex = toHexColor(name)
+  if (explicitHex) {
+    return {
+      jersey: explicitHex,
+      onJersey: foregroundForHex(explicitHex),
+      border: 'rgba(148, 163, 184, 0.48)',
+    }
+  }
+
+  const normalizedName = normalizeTeamColorKey(name)
+  const normalizedFallback = normalizeTeamColorKey(fallback)
+
+  const directTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedName)?.[1]
+  if (directTone) return directTone
+
+  const fallbackTone = Object.entries(teamPalette).find(([key]) => normalizeTeamColorKey(key) === normalizedFallback)?.[1]
+  return fallbackTone || teamPalette.Blanco
+}
+
+const isLightJersey = (hexColor) => {
+  if (!hexColor || !hexColor.startsWith('#') || hexColor.length !== 7) return false
+  const r = parseInt(hexColor.slice(1, 3), 16)
+  const g = parseInt(hexColor.slice(3, 5), 16)
+  const b = parseInt(hexColor.slice(5, 7), 16)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminance >= 0.68
+}
+
 const createTeamTone = (name, fallback) => {
-  const tone = teamPalette[name] || teamPalette[fallback]
-  const darkText = tone.onJersey === '#111827'
+  const tone = resolveTeamTone(name, fallback)
+  const darkText = isLightJersey(tone.jersey)
   return {
     cardStyle: {
       backgroundColor: tone.jersey,
       borderColor: tone.border,
+      color: darkText ? '#111827' : '#f8fafc',
     },
     titleStyle: {
-      color: tone.onJersey,
+      color: darkText ? '#111827' : tone.onJersey,
     },
     subtitleStyle: {
-      color: darkText ? 'rgba(17, 24, 39, 0.78)' : 'rgba(248, 250, 252, 0.88)',
+      color: darkText ? '#111827' : 'rgba(248, 250, 252, 0.88)',
     },
     playerRowStyle: {
       borderColor: tone.border,
       backgroundColor: 'rgba(0, 0, 0, 0.14)',
     },
     controlIdleStyle: {
-      backgroundColor: darkText ? 'rgba(255, 255, 255, 0.72)' : 'rgba(0, 0, 0, 0.28)',
+      backgroundColor: darkText ? 'rgba(226, 232, 240, 0.9)' : 'rgba(0, 0, 0, 0.28)',
       color: darkText ? '#111827' : '#f8fafc',
-      borderColor: darkText ? 'rgba(17, 24, 39, 0.3)' : 'rgba(255, 255, 255, 0.45)',
+      borderColor: darkText ? 'rgba(17, 24, 39, 0.4)' : 'rgba(255, 255, 255, 0.45)',
     },
   }
 }
@@ -129,6 +222,7 @@ onMounted(async () => {
     }
 
     partido.value = detalle
+    sincronizarResultadoOficialForm()
 
     await cargarAnalisisBalance(partidoId)
     await cargarPanelVotacion(partidoId)
@@ -160,7 +254,7 @@ const inscribirse = async () => {
     const detalle = await partidoService.inscribirseAPartido(partido.value.id)
     partido.value = detalle
     feedbackInscripcion.value = 'Te has inscrito correctamente. Estás en la lista de pendientes de asignación.'
-    uiStore.showToast({ message: 'Te has inscrito correctamente.', type: 'success' })
+    uiStore.showToast({ message: 'Te has inscrito correctamente.', type: 'join-success', duration: 5000 })
     setTimeout(() => {
       feedbackInscripcion.value = ''
     }, 4500)
@@ -201,6 +295,7 @@ const recargarPartido = async () => {
   try {
     const detalle = await partidoService.obtenerDetallePartido(partido.value.id)
     partido.value = detalle
+    sincronizarResultadoOficialForm()
     await cargarAnalisisBalance(partido.value.id)
     await cargarPanelVotacion(partido.value.id)
     await cargarEstadoPagoReserva(partido.value.id)
@@ -452,6 +547,7 @@ const cargarPanelVotacion = async (partidoId) => {
     miVoto.value = null
     resumenVotacion.value = null
     companerosAsignados.value = []
+    resetVotacionForm()
     return
   }
 
@@ -491,9 +587,11 @@ const cargarPanelVotacion = async (partidoId) => {
         }
       } else {
         miVoto.value = null
+        resetVotacionForm()
       }
     } catch (err) {
       miVoto.value = null
+      resetVotacionForm()
     }
 
     try {
@@ -524,6 +622,7 @@ const guardarVotacion = async () => {
 
     miVoto.value = await partidoVotacionService.guardarMiVoto(partido.value.id, payload)
     mensajeVotacion.value = 'Tu votación se guardó correctamente.'
+    mostrarModalDiscusionResultado.value = false
 
     resumenVotacion.value = await partidoVotacionService.obtenerPanelCompartido(partido.value.id)
   } catch (err) {
@@ -542,10 +641,6 @@ const obtenerNombreAmigo = (amigo) => {
   return amigo.usuarioA.id === authStore.user?.id ? amigo.usuarioB.nombre : amigo.usuarioA.nombre
 }
 
-const obtenerEmailAmigo = (amigo) => {
-  return amigo.usuarioA.id === authStore.user?.id ? amigo.usuarioB.email : amigo.usuarioA.email
-}
-
 const formatearFecha = (fecha) => {
   return formatDateTimeEs(fecha)
 }
@@ -557,6 +652,13 @@ const textoVotosResumen = computed(() => {
 })
 
 const marcadorPromedio = computed(() => {
+  if (Number.isFinite(Number(partido.value?.golesEquipoA)) && Number.isFinite(Number(partido.value?.golesEquipoB))) {
+    return {
+      golesA: Number(partido.value.golesEquipoA),
+      golesB: Number(partido.value.golesEquipoB),
+    }
+  }
+
   const golesA = Number(resumenVotacion.value?.promedioGolesEquipoA)
   const golesB = Number(resumenVotacion.value?.promedioGolesEquipoB)
   return {
@@ -573,6 +675,7 @@ const formatIntensidad = (intensidad) => {
 const resultadoBanner = computed(() => {
   const golesA = marcadorPromedio.value.golesA
   const golesB = marcadorPromedio.value.golesB
+  const usaResultadoOficial = Number.isFinite(Number(partido.value?.golesEquipoA)) && Number.isFinite(Number(partido.value?.golesEquipoB))
 
   const usuarioEnA = partido.value?.equipoA?.some((j) => String(j.id) === String(authStore.user?.id))
   const usuarioEnB = partido.value?.equipoB?.some((j) => String(j.id) === String(authStore.user?.id))
@@ -588,7 +691,7 @@ const resultadoBanner = computed(() => {
   if (golesA === golesB) {
     return {
       titulo: 'Empate',
-      subtitulo: 'Resultado promedio equilibrado.',
+      subtitulo: usaResultadoOficial ? 'Resultado oficial fijado por organización.' : 'Resultado promedio equilibrado.',
       clase: 'bg-orange-500 text-white',
     }
   }
@@ -598,14 +701,14 @@ const resultadoBanner = computed(() => {
     if (victoria) {
       return {
         titulo: 'Victoria',
-        subtitulo: 'Tu equipo sale ganador en el promedio.',
+        subtitulo: usaResultadoOficial ? 'Resultado oficial fijado por organización.' : 'Tu equipo sale ganador en el promedio.',
         clase: 'bg-emerald-600 text-white',
       }
     }
 
     return {
       titulo: 'Derrota',
-      subtitulo: 'Tu equipo queda por debajo en el promedio.',
+      subtitulo: usaResultadoOficial ? 'Resultado oficial fijado por organización.' : 'Tu equipo queda por debajo en el promedio.',
       clase: 'bg-rose-600 text-white',
     }
   }
@@ -613,15 +716,38 @@ const resultadoBanner = computed(() => {
   return golesA > golesB
     ? {
       titulo: `Gana equipo ${partido.value?.colorEquipoA || 'A'}`,
-      subtitulo: 'Resultado promedio del panel compartido.',
+      subtitulo: usaResultadoOficial ? 'Resultado oficial fijado por organización.' : 'Resultado promedio del panel compartido.',
       clase: 'bg-emerald-600 text-white',
     }
     : {
       titulo: `Gana equipo ${partido.value?.colorEquipoB || 'B'}`,
-      subtitulo: 'Resultado promedio del panel compartido.',
+      subtitulo: usaResultadoOficial ? 'Resultado oficial fijado por organización.' : 'Resultado promedio del panel compartido.',
       clase: 'bg-rose-600 text-white',
     }
 })
+
+const guardarResultadoOficial = async () => {
+  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO') return
+
+  const golesA = Number(resultadoOficialForm.value.golesEquipoA)
+  const golesB = Number(resultadoOficialForm.value.golesEquipoB)
+  if (!Number.isInteger(golesA) || !Number.isInteger(golesB) || golesA < 0 || golesB < 0) {
+    uiStore.showToast({ message: 'El resultado oficial debe tener goles válidos (0 o más).', type: 'warning' })
+    return
+  }
+
+  guardandoResultadoOficial.value = true
+  try {
+    const detalle = await partidoService.actualizarResultadoOficial(partido.value.id, golesA, golesB)
+    partido.value = detalle
+    sincronizarResultadoOficialForm()
+    uiStore.showToast({ message: 'Resultado oficial actualizado.', type: 'success' })
+  } catch (err) {
+    uiStore.showToast({ message: err?.message || 'No se pudo actualizar el resultado oficial', type: 'error' })
+  } finally {
+    guardandoResultadoOficial.value = false
+  }
+}
 
 const diferencialesResumen = computed(() => {
   const lista = Array.isArray(resumenVotacion.value?.jugadoresDiferenciales)
@@ -738,6 +864,14 @@ const procesarRatingPartido = async () => {
 
 const handleGoBack = () => {
   router.back()
+}
+
+const abrirModalDiscusionResultado = () => {
+  mostrarModalDiscusionResultado.value = true
+}
+
+const cerrarModalDiscusionResultado = () => {
+  mostrarModalDiscusionResultado.value = false
 }
 
 </script>
@@ -863,70 +997,40 @@ const handleGoBack = () => {
         <h3 class="text-xl font-bold text-slate-800 mb-2">Panel de votación</h3>
         <p class="text-sm text-slate-600 mb-4">Al finalizar, registra tu evaluación rápida y envía tu voto.</p>
 
-        <div v-if="esOrganizador()" class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-700">Estado de calidad</span>
-              <span :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold', claseEstadoCalidad]">
-                {{ partido.estadoCalidad || 'NORMAL' }}
-              </span>
-              <span :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold', claseResultadoResolucion]">
-                {{ resultadoResolucionTexto }}
-              </span>
-            </div>
-
-            <BaseButton
-              size="sm"
-              :loading="procesandoRating"
-              :disabled="procesandoRating || partido.ratingProcesado === true"
-              @click="procesarRatingPartido"
-            >
-              {{ partido.ratingProcesado ? 'Rating ya procesado' : 'Procesar rating oficial' }}
-            </BaseButton>
-          </div>
-
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-            <div class="rounded-lg border border-slate-200 bg-white p-2">
-              <p class="text-slate-500">Score calidad</p>
-              <p class="font-bold text-slate-800">{{ scoreCalidadTexto }}</p>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-2">
-              <p class="text-slate-500">Participación votos</p>
-              <p class="font-bold text-slate-800">{{ participacionVotacionTexto }}</p>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-2">
-              <p class="text-slate-500">Votos considerados</p>
-              <p class="font-bold text-slate-800">{{ resultadoProcesoRating?.votosConsiderados ?? 0 }}</p>
-            </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-2">
-              <p class="text-slate-500">Votos atípicos</p>
-              <p class="font-bold text-slate-800">{{ resultadoProcesoRating?.votosAtipicos ?? 0 }}</p>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-slate-200 bg-white p-2.5 text-xs space-y-1">
-            <p class="font-semibold text-slate-800">Bitácora de rating</p>
-            <p class="text-slate-600">
-              <span class="font-medium text-slate-700">Procesado oficialmente:</span>
-              {{ fechaProcesadoTexto }}
-            </p>
-            <p class="text-slate-600">
-              <span class="font-medium text-slate-700">Última ejecución:</span>
-              {{ fechaUltimaEjecucionTexto }}
-            </p>
-            <p v-if="ultimaEjecucionRating?.mensaje" class="text-slate-600">
-              <span class="font-medium text-slate-700">Detalle:</span>
-              {{ ultimaEjecucionRating.mensaje }}
-            </p>
-          </div>
-
-          <p v-if="mensajeProcesoRating" class="text-xs font-medium text-slate-700">{{ mensajeProcesoRating }}</p>
-        </div>
-
         <div v-if="cargandoVotacion" class="text-slate-600 text-sm">Cargando votaciones...</div>
 
-        <div v-else class="space-y-3">
-          <div class="grid grid-cols-2 gap-2">
+        <div v-else-if="esOrganizador()" class="space-y-3">
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs font-semibold text-slate-700">Resultado oficial (solo organización)</p>
+                <p class="text-[11px] text-slate-500">Este marcador tiene prioridad sobre el promedio de votos para resolver el resultado.</p>
+              </div>
+              <span
+                v-if="Number.isFinite(Number(partido?.golesEquipoA)) && Number.isFinite(Number(partido?.golesEquipoB))"
+                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+              >
+                Fijado
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block">
+                <span class="block text-xs text-slate-600 mb-1">Goles equipo A</span>
+                <input v-model.number="resultadoOficialForm.golesEquipoA" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+              </label>
+              <label class="block">
+                <span class="block text-xs text-slate-600 mb-1">Goles equipo B</span>
+                <input v-model.number="resultadoOficialForm.golesEquipoB" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+              </label>
+            </div>
+            <div class="flex justify-end">
+              <BaseButton size="sm" :loading="guardandoResultadoOficial" :disabled="guardandoResultadoOficial" @click="guardarResultadoOficial">
+                Guardar resultado oficial
+              </BaseButton>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Intensidad del partido</label>
               <select v-model="votacionForm.intensidadPartido" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
@@ -961,31 +1065,30 @@ const handleGoBack = () => {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">¿Partido alterado por incidencias?</label>
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                @click="votacionForm.partidoAlterado = false"
-                :class="[
-                  'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
-                  !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
-                ]"
-              >
-                No
-              </button>
-              <button
-                type="button"
-                @click="votacionForm.partidoAlterado = true"
-                :class="[
-                  'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
-                  votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
-                ]"
-              >
-                Sí
-              </button>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">¿Partido alterado por incidencias?</label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="votacionForm.partidoAlterado = false"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  @click="votacionForm.partidoAlterado = true"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  Sí
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1006,7 +1109,7 @@ const handleGoBack = () => {
                 <h4 class="font-bold" :style="teamAColor.titleStyle">Equipo {{ partido.colorEquipoA || 'A' }}</h4>
                 <div class="flex items-center gap-1 text-xs" :style="teamAColor.subtitleStyle">
                   <span>Resultado</span>
-                  <input v-model.number="votacionForm.golesEquipoAPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-white" />
+                  <input v-model.number="votacionForm.golesEquipoAPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-slate-900" />
                 </div>
               </div>
               <div v-if="!partido.equipoA || partido.equipoA.length === 0" class="text-xs" :style="teamAColor.subtitleStyle">Sin jugadores</div>
@@ -1092,7 +1195,7 @@ const handleGoBack = () => {
                 <h4 class="font-bold" :style="teamBColor.titleStyle">Equipo {{ partido.colorEquipoB || 'B' }}</h4>
                 <div class="flex items-center gap-1 text-xs" :style="teamBColor.subtitleStyle">
                   <span>Resultado</span>
-                  <input v-model.number="votacionForm.golesEquipoBPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-white" />
+                  <input v-model.number="votacionForm.golesEquipoBPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-slate-900" />
                 </div>
               </div>
               <div v-if="!partido.equipoB || partido.equipoB.length === 0" class="text-xs" :style="teamBColor.subtitleStyle">Sin jugadores</div>
@@ -1185,12 +1288,26 @@ const handleGoBack = () => {
           <p v-if="mensajeVotacion" class="text-sm font-medium text-slate-700">{{ mensajeVotacion }}</p>
 
           <div v-if="resumenVotacion" class="mt-3 bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
-            <h4 class="text-sm font-semibold text-slate-800">Resumen compartido de votación</h4>
+            <div class="flex items-start justify-between gap-2">
+              <h4 class="text-sm font-semibold text-slate-800">Resumen compartido de votación</h4>
+            </div>
+
+            <div v-if="partido?.estado === 'FINALIZADO' && !partido?.ratingProcesado" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p class="text-xs text-slate-600">El partido ya finalizó. Si quieres cerrar el rating oficial, hazlo manualmente.</p>
+              <BaseButton size="sm" :loading="procesandoRating" :disabled="procesandoRating" @click="procesarRatingPartido">
+                Procesar rating
+              </BaseButton>
+            </div>
+            <div v-else-if="partido?.ratingProcesado" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              El rating oficial ya fue procesado.
+            </div>
 
             <div :class="['w-full rounded-xl px-3 py-2.5 grid grid-cols-2 gap-2 items-center', resultadoBanner.clase]">
               <div class="min-w-0">
                 <p class="text-lg md:text-xl font-extrabold leading-none">{{ resultadoBanner.titulo }}</p>
-                <p class="text-[11px] md:text-xs opacity-95 mt-0.5 truncate">Panel compartido</p>
+                <p class="text-[11px] md:text-xs opacity-95 mt-0.5 truncate">
+                  {{ Number.isFinite(Number(partido?.golesEquipoA)) && Number.isFinite(Number(partido?.golesEquipoB)) ? 'Resultado oficial' : 'Panel compartido' }}
+                </p>
               </div>
               <div class="text-right">
                 <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Marcador</p>
@@ -1227,10 +1344,155 @@ const handleGoBack = () => {
           </div>
         </div>
 
+        <div v-else class="space-y-3">
+          <div v-if="resumenVotacion" class="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <h4 class="text-sm font-semibold text-slate-800">Resumen compartido de votación</h4>
+              <BaseButton size="sm" variant="secondary" @click="abrirModalDiscusionResultado">
+                Discutir resultado
+              </BaseButton>
+            </div>
+
+            <div :class="['w-full rounded-xl px-3 py-2.5 grid grid-cols-2 gap-2 items-center', resultadoBanner.clase]">
+              <div class="min-w-0">
+                <p class="text-lg md:text-xl font-extrabold leading-none">{{ resultadoBanner.titulo }}</p>
+                <p class="text-[11px] md:text-xs opacity-95 mt-0.5 truncate">
+                  {{ Number.isFinite(Number(partido?.golesEquipoA)) && Number.isFinite(Number(partido?.golesEquipoB)) ? 'Resultado oficial' : 'Panel compartido' }}
+                </p>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Marcador</p>
+                <p class="text-2xl md:text-3xl font-black leading-none">{{ marcadorPromedio.golesA.toFixed(0) }} - {{ marcadorPromedio.golesB.toFixed(0) }}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1.5">
+              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                <p class="text-[11px] text-slate-600">Intensidad</p>
+                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ formatIntensidad(resumenVotacion.intensidadMasVotada) }}</p>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                <p class="text-[11px] text-slate-600">Balanceo</p>
+                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ Number(resumenVotacion.porcentajePartidoParejo || 0).toFixed(0) }}%</p>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+              <p class="text-xs font-semibold text-slate-800 mb-1.5">Diferenciales (número de veces)</p>
+              <div v-if="diferencialesResumen.length" class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="jugador in diferencialesResumen"
+                  :key="jugador.jugadorId"
+                  class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
+                >
+                  <span class="truncate max-w-[120px]">{{ jugador.jugadorNombre }}</span>
+                  <span class="font-bold">{{ jugador.votos }}</span>
+                </span>
+              </div>
+              <p v-else class="text-xs text-slate-500">Sin votos de diferenciales por ahora.</p>
+              <p v-if="diferencialesRestantes > 0" class="text-xs text-slate-500 mt-1">+{{ diferencialesRestantes }} más</p>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-500">Tu resultado se suma a la media compartida desde el popup.</p>
+        </div>
+
       </section>
     </template>
 
-    <section v-else class="state-empty">
+    <div v-if="mostrarModalDiscusionResultado" class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+      <div class="card-surface w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Discutir resultado</h3>
+            <p class="text-xs text-slate-600">Tu resultado se sumará a la media compartida.</p>
+          </div>
+          <BaseButton size="sm" variant="ghost" @click="cerrarModalDiscusionResultado">Cerrar</BaseButton>
+        </div>
+
+        <div class="space-y-4 p-4">
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block">
+              <span class="block text-xs font-medium text-slate-700 mb-1">Goles equipo A</span>
+              <input v-model.number="votacionForm.golesEquipoAPropuesto" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+            </label>
+            <label class="block">
+              <span class="block text-xs font-medium text-slate-700 mb-1">Goles equipo B</span>
+              <input v-model.number="votacionForm.golesEquipoBPropuesto" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+            </label>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Intensidad del partido</label>
+              <select v-model="votacionForm.intensidadPartido" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+                <option value="BAJO">Bajo</option>
+                <option value="MEDIO">Medio</option>
+                <option value="ALTO">Alto</option>
+                <option value="MUY_ALTO">Muy alto</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Balanceado</label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="votacionForm.partidoFueParejo = true"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    votacionForm.partidoFueParejo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  Sí
+                </button>
+                <button
+                  type="button"
+                  @click="votacionForm.partidoFueParejo = false"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    !votacionForm.partidoFueParejo ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  No
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">¿Partido alterado?</label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="votacionForm.partidoAlterado = false"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  @click="votacionForm.partidoAlterado = true"
+                  :class="[
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
+                  ]"
+                >
+                  Sí
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2">
+            <BaseButton variant="secondary" @click="cerrarModalDiscusionResultado">Cancelar</BaseButton>
+            <BaseButton :loading="guardandoVotacion" @click="guardarVotacion">Enviar votación</BaseButton>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section v-if="!loading && !error && !partido" class="state-empty">
       <p class="text-slate-700 font-medium">Partido no encontrado.</p>
       <div class="mt-3">
         <BaseButton variant="secondary" @click="handleGoBack">Volver</BaseButton>
@@ -1253,7 +1515,6 @@ const handleGoBack = () => {
             <div v-for="amigo in amigos" :key="amigo.id" class="bg-slate-50 rounded-xl p-3 flex justify-between items-center border border-slate-200 gap-2">
               <div>
                 <p class="font-semibold text-slate-800">{{ obtenerNombreAmigo(amigo) }}</p>
-                <p class="text-xs text-slate-600">{{ obtenerEmailAmigo(amigo) }}</p>
               </div>
               <BaseButton
                 size="sm"

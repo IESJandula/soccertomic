@@ -15,7 +15,7 @@ const emit = defineEmits(['update:modelValue'])
 
 <template>
   <div class="space-y-1.5">
-    <label class="text-sm font-semibold text-slate-900">Estilo de juego</label>
+    <label class="text-sm font-semibold text-slate-100">Estilo de juego</label>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
       <button
         v-for="opt in options"

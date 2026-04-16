@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
 import java.util.List;
 
 @RestController
@@ -40,15 +39,10 @@ public class PartidoVotacionController {
             HttpServletRequest request,
             @Valid @RequestBody PartidoVotacionRequestDTO dto
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            return ResponseEntity.ok(partidoVotacionService.guardarVoto(partidoId, usuario.get(), dto));
+            return ResponseEntity.ok(partidoVotacionService.guardarVoto(partidoId, usuario, dto));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         } catch (RuntimeException e) {
@@ -61,15 +55,10 @@ public class PartidoVotacionController {
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            return ResponseEntity.ok(partidoVotacionService.obtenerMiVoto(partidoId, usuario.get()));
+            return ResponseEntity.ok(partidoVotacionService.obtenerMiVoto(partidoId, usuario));
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
@@ -82,15 +71,10 @@ public class PartidoVotacionController {
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            return ResponseEntity.ok(partidoVotacionService.obtenerPanelCompartido(partidoId, usuario.get()));
+            return ResponseEntity.ok(partidoVotacionService.obtenerPanelCompartido(partidoId, usuario));
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).build();
         }
@@ -101,15 +85,10 @@ public class PartidoVotacionController {
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            return ResponseEntity.ok(partidoVotacionService.obtenerAsignacion(partidoId, usuario.get()));
+            return ResponseEntity.ok(partidoVotacionService.obtenerAsignacion(partidoId, usuario));
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).build();
         }

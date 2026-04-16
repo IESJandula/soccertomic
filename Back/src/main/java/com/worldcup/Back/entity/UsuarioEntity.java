@@ -25,20 +25,14 @@ public class UsuarioEntity {
     @Column
     private String nombre;
 
-    @Column(unique = true, nullable = false)
+    @Transient
     private String email;
 
     @Column(name = "firebase_uid", unique = true, nullable = false)
     private String firebaseUid;
 
     @Column(nullable = true)
-    private String password;
-
-    @Column(nullable = true)
     private String foto;
-
-    @Column(nullable = true, length = 400)
-    private String bio;
 
     @Column(nullable = true)
     private String nivel = "beginner"; // beginner, intermedio, avanzado
@@ -49,7 +43,7 @@ public class UsuarioEntity {
     @Column(nullable = false, precision = 6, scale = 2)
     private BigDecimal ratingSigma = new BigDecimal("8.33");
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 50)
     private String ratingVersion = "v1";
 
     @Column(nullable = false)

@@ -326,7 +326,6 @@ const eliminarEquipoRapido = async (equipo) => {
               >
                 <div class="min-w-0">
                   <p class="font-semibold text-slate-800 truncate">{{ usuario.nombre }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ usuario.email }}</p>
                 </div>
                 <BaseButton
                   size="sm"
@@ -353,7 +352,6 @@ const eliminarEquipoRapido = async (equipo) => {
             <article v-for="amistad in amigos" :key="amistad.id" class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <p class="font-semibold text-slate-800 truncate">{{ getOtroUsuario(amistad).nombre }}</p>
-                <p class="text-xs text-slate-500 truncate">{{ getOtroUsuario(amistad).email }}</p>
               </div>
               <div class="flex items-center gap-2">
                 <BaseButton
@@ -521,7 +519,6 @@ const eliminarEquipoRapido = async (equipo) => {
           <article v-for="persona in ultimasPersonas" :key="persona.id" class="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
             <div class="min-w-0">
               <p class="font-semibold text-slate-800 truncate">{{ persona.nombre }}</p>
-              <p class="text-xs text-slate-500 truncate">{{ persona.email }}</p>
             </div>
             <BaseButton
               size="sm"

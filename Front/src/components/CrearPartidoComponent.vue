@@ -28,7 +28,6 @@ const form = ref({
   lugar: 'Universidad de Jaén',
   jugadoresPorEquipo: 7,
   tipo: 'PRIVADO',
-  modoEquipos: 'MANUAL',
   colorEquipoA: 'Blanco',
   colorEquipoB: 'Negro',
   convocarEquipoRapido: false,
@@ -120,7 +119,7 @@ const handleSubmit = async () => {
       jugadoresPorEquipo: Number(form.value.jugadoresPorEquipo),
       duracionMinutos: 60,
       tipo: form.value.tipo,
-      modoEquipos: form.value.modoEquipos,
+      modoEquipos: 'MANUAL', // Teams are always managed by organizer
       colorEquipoA: form.value.colorEquipoA,
       colorEquipoB: form.value.colorEquipoB,
       convocarEquipoRapidoId: form.value.convocarEquipoRapido ? Number(form.value.convocarEquipoRapidoId) : null,
@@ -183,18 +182,6 @@ const handleCancel = () => {
             >
               <option value="PRIVADO">Privado (invitación)</option>
               <option value="PUBLICO">Público (abierto)</option>
-            </select>
-          </label>
-
-          <label class="block lg:col-span-2">
-            <span class="block text-xs font-medium text-slate-700 mb-0.5">Modo de equipos</span>
-            <select
-              v-model="form.modoEquipos"
-              :disabled="loading"
-              class="w-full h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="MANUAL">Manual (equipos armados por organizador)</option>
-              <option value="AUTO">Auto (balance automático por nivel visible)</option>
             </select>
           </label>
         </div>

@@ -29,6 +29,7 @@ export const ENDPOINTS = {
   PARTIDOS_HISTORIAL_PUBLICO_BY_USER: (usuarioId) => `${CORE_API_BASE_URL}/api/partidos/historial/public/${usuarioId}`,
   PARTIDOS_FUTUROS: `${CORE_API_BASE_URL}/api/partidos/futuros`,
   PARTIDOS_BALANCEAR: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/balancear-equipos`,
+  PARTIDOS_RESULTADO_OFICIAL: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/resultado-oficial`,
   PARTIDOS_VOTACION_ME: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/me`,
   PARTIDOS_VOTACION_ASIGNACION: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/asignacion`,
   PARTIDOS_VOTACION_PANEL_COMPARTIDO: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/panel-compartido`,
@@ -37,6 +38,8 @@ export const ENDPOINTS = {
   INVITACIONES: `${CORE_API_BASE_URL}/api/invitaciones`,
   INVITACIONES_MIS: `${CORE_API_BASE_URL}/api/invitaciones/mis-invitaciones`,
   INVITACIONES_PENDIENTES: `${CORE_API_BASE_URL}/api/invitaciones/pendientes`,
+  EQUIPOS_RAPIDOS: `${CORE_API_BASE_URL}/api/equipos-rapidos`,
+  EQUIPOS_RAPIDOS_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/mis-equipos`,
   EQUIPO_INVITACIONES: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones`,
   EQUIPO_INVITACIONES_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones/mis-invitaciones`,
 

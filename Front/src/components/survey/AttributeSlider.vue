@@ -43,7 +43,7 @@ const tooltip = computed(() => {
 <template>
   <div class="flex flex-col gap-1.5">
     <div class="flex items-center justify-between">
-      <label class="text-sm font-semibold text-slate-900">{{ label }}</label>
+      <label class="text-sm font-semibold text-slate-100">{{ label }}</label>
       <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
         {{ modelValue }}/5
       </span>

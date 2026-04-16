@@ -77,6 +77,19 @@ class APIService {
         ...fetchOptions
       } = options
 
+      const body = fetchOptions.body
+      const isPlainJsonBody = body !== null
+        && typeof body === 'object'
+        && !ArrayBuffer.isView(body)
+        && !(body instanceof ArrayBuffer)
+        && !(body instanceof Blob)
+        && !(body instanceof FormData)
+        && !(body instanceof URLSearchParams)
+
+      if (isPlainJsonBody) {
+        fetchOptions.body = JSON.stringify(body)
+      }
+
       if (useCache && cacheKey) {
         const cached = this.readCache(cacheKey)
         if (cached) {
@@ -168,11 +181,8 @@ class APIService {
    * @param {string} nombre - User's display name
    * @param {string} email - User's email address (required for database)
    */
-  async upsertPerfil(nombre, email, bio = undefined) {
+  async upsertPerfil(nombre, email) {
     const body = { nombre, email }
-    if (bio !== undefined) {
-      body.bio = bio
-    }
 
     return this.request(ENDPOINTS.AUTH_ME, {
       method: 'PUT',

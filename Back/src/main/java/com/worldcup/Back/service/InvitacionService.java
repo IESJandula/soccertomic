@@ -22,7 +22,12 @@ public class InvitacionService {
     private InvitacionRepository invitacionRepository;
 
     @Transactional
-    public InvitacionEntity crearInvitacion(PartidoEntity partido, UsuarioEntity usuario) {
+    public InvitacionEntity crearInvitacion(PartidoEntity partido, UsuarioEntity usuario, UsuarioEntity solicitante) {
+        if (solicitante == null || solicitante.getId() == null || partido.getOrganizadores() == null
+                || partido.getOrganizadores().stream().noneMatch(rel -> rel.getUsuario() != null && solicitante.getId().equals(rel.getUsuario().getId()))) {
+            throw new RuntimeException("Solo una persona organizadora puede crear invitaciones");
+        }
+
         InvitacionEntity invitacion = new InvitacionEntity();
         invitacion.setPartido(partido);
         invitacion.setUsuario(usuario);
@@ -45,29 +50,35 @@ public class InvitacionService {
     }
 
     @Transactional
-    public InvitacionEntity aceptarInvitacion(Long invitacionId) {
-        Optional<InvitacionEntity> invitacion = invitacionRepository.findById(invitacionId);
-        if (invitacion.isPresent()) {
-            InvitacionEntity inv = invitacion.get();
-            inv.setEstado(EstadoInvitacion.ACEPTADA);
-            inv.setPagada(false);
-            inv.setRespondidaEn(LocalDateTime.now());
-            return invitacionRepository.save(inv);
+    public InvitacionEntity aceptarInvitacion(Long invitacionId, UsuarioEntity solicitante) {
+        InvitacionEntity invitacion = invitacionRepository.findById(invitacionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invitación", invitacionId));
+
+        if (solicitante == null || solicitante.getId() == null || invitacion.getUsuario() == null || invitacion.getUsuario().getId() == null
+                || !invitacion.getUsuario().getId().equals(solicitante.getId())) {
+            throw new RuntimeException("Solo la persona destinataria puede responder a esta invitación");
         }
-        throw new ResourceNotFoundException("Invitación", invitacionId);
+
+        invitacion.setEstado(EstadoInvitacion.ACEPTADA);
+        invitacion.setPagada(false);
+        invitacion.setRespondidaEn(LocalDateTime.now());
+        return invitacionRepository.save(invitacion);
     }
 
     @Transactional
-    public InvitacionEntity rechazarInvitacion(Long invitacionId) {
-        Optional<InvitacionEntity> invitacion = invitacionRepository.findById(invitacionId);
-        if (invitacion.isPresent()) {
-            InvitacionEntity inv = invitacion.get();
-            inv.setEstado(EstadoInvitacion.RECHAZADA);
-            inv.setPagada(false);
-            inv.setRespondidaEn(LocalDateTime.now());
-            return invitacionRepository.save(inv);
+    public InvitacionEntity rechazarInvitacion(Long invitacionId, UsuarioEntity solicitante) {
+        InvitacionEntity invitacion = invitacionRepository.findById(invitacionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invitación", invitacionId));
+
+        if (solicitante == null || solicitante.getId() == null || invitacion.getUsuario() == null || invitacion.getUsuario().getId() == null
+                || !invitacion.getUsuario().getId().equals(solicitante.getId())) {
+            throw new RuntimeException("Solo la persona destinataria puede responder a esta invitación");
         }
-        throw new ResourceNotFoundException("Invitación", invitacionId);
+
+        invitacion.setEstado(EstadoInvitacion.RECHAZADA);
+        invitacion.setPagada(false);
+        invitacion.setRespondidaEn(LocalDateTime.now());
+        return invitacionRepository.save(invitacion);
     }
 
     public InvitacionEntity crearNotificacionCancelacion(PartidoEntity partido, UsuarioEntity usuario) {
@@ -160,7 +171,28 @@ public class InvitacionService {
     }
 
     @Transactional
-    public void eliminarInvitacion(Long invitacionId) {
-        invitacionRepository.deleteById(invitacionId);
+    public void eliminarInvitacion(Long invitacionId, UsuarioEntity solicitante) {
+        InvitacionEntity invitacion = invitacionRepository.findById(invitacionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invitación", invitacionId));
+
+        boolean esDestinatario = solicitante != null
+                && solicitante.getId() != null
+                && invitacion.getUsuario() != null
+                && invitacion.getUsuario().getId() != null
+                && solicitante.getId().equals(invitacion.getUsuario().getId());
+        boolean esOrganizador = partidoTieneOrganizador(invitacion.getPartido(), solicitante);
+
+        if (!esDestinatario && !esOrganizador) {
+            throw new RuntimeException("Solo la persona destinataria o una persona organizadora puede eliminar la invitación");
+        }
+
+        invitacionRepository.delete(invitacion);
+    }
+
+    private boolean partidoTieneOrganizador(PartidoEntity partido, UsuarioEntity usuario) {
+        return partido != null && usuario != null && usuario.getId() != null
+                && partido.getOrganizadores() != null
+                && partido.getOrganizadores().stream()
+                .anyMatch(rel -> rel.getUsuario() != null && usuario.getId().equals(rel.getUsuario().getId()));
     }
 }

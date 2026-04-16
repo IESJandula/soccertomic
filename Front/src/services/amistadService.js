@@ -34,6 +34,32 @@ class AmistadService {
     })
   }
 
+  async obtenerMisEquipos() {
+    return apiService.request(ENDPOINTS.EQUIPOS_RAPIDOS_MIS, {
+      method: 'GET',
+      useCache: false,
+    })
+  }
+
+  async crearEquipoRapido(nombre, miembroIds = [], capacidad = 7) {
+    return apiService.request(ENDPOINTS.EQUIPOS_RAPIDOS, {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre,
+        miembroIds,
+        capacidad,
+      }),
+      useCache: false,
+    })
+  }
+
+  async eliminarEquipoRapido(equipoId) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS}/${equipoId}`, {
+      method: 'DELETE',
+      useCache: false,
+    })
+  }
+
   // Aceptar solicitud de amistad
   async aceptarSolicitud(amistadId) {
     const url = `${ENDPOINTS.AMISTADES}/${amistadId}/aceptar`

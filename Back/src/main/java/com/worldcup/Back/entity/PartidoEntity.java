@@ -96,10 +96,6 @@ public class PartidoEntity {
     )
     private List<UsuarioEntity> equipoB = new ArrayList<>();
 
-    // Chat del partido
-    @OneToMany(mappedBy = "partido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    private List<ChatPartidoEntity> chat = new ArrayList<>();
-
     // Resultado (post-partido)
     @Column
     private Integer golesEquipoA = null;

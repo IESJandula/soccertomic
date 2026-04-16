@@ -4,6 +4,7 @@ import com.worldcup.Back.dto.response.InvitacionResponseDTO;
 import com.worldcup.Back.entity.InvitacionEntity;
 import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
+import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.security.FirebaseRequestContext;
 import com.worldcup.Back.service.InvitacionService;
 import com.worldcup.Back.service.PartidoService;
@@ -73,9 +74,11 @@ public class InvitacionController {
 
     @PostMapping
     public ResponseEntity<InvitacionResponseDTO> crearInvitacion(
+            HttpServletRequest request,
             @RequestParam Long partidoId,
             @RequestParam Long usuarioId
     ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
         Optional<PartidoEntity> partido = partidoService.obtenerPorId(partidoId);
         Optional<UsuarioEntity> usuario = userService.buscarPorId(usuarioId);
 
@@ -83,20 +86,19 @@ public class InvitacionController {
             return ResponseEntity.badRequest().build();
         }
 
-        InvitacionEntity invitacion = invitacionService.crearInvitacion(partido.get(), usuario.get());
+        if (!partidoService.esOrganizadorPartido(partido.get(), solicitante)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        InvitacionEntity invitacion = invitacionService.crearInvitacion(partido.get(), usuario.get(), solicitante);
         return ResponseEntity.ok(entityToDTO(invitacion));
     }
 
     @GetMapping("/mis-invitaciones")
     public ResponseEntity<List<InvitacionResponseDTO>> obtenerMisInvitaciones(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        List<InvitacionEntity> invitaciones = invitacionService.obtenerInvitacionesDeUsuario(usuario.get());
+        List<InvitacionEntity> invitaciones = invitacionService.obtenerInvitacionesDeUsuario(usuario);
         List<InvitacionResponseDTO> dtos = invitaciones.stream()
                 .map(this::entityToDTO)
                 .collect(Collectors.toList());
@@ -105,14 +107,9 @@ public class InvitacionController {
 
     @GetMapping("/pendientes")
     public ResponseEntity<List<InvitacionResponseDTO>> obtenerInvitacionesPendientes(HttpServletRequest request) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        List<InvitacionEntity> invitaciones = invitacionService.obtenerInvitacionesPendientes(usuario.get());
+        List<InvitacionEntity> invitaciones = invitacionService.obtenerInvitacionesPendientes(usuario);
         List<InvitacionResponseDTO> dtos = invitaciones.stream()
                 .map(this::entityToDTO)
                 .collect(Collectors.toList());
@@ -120,28 +117,53 @@ public class InvitacionController {
     }
 
     @PutMapping("/{id}/aceptar")
-    public ResponseEntity<InvitacionResponseDTO> aceptarInvitacion(@PathVariable Long id) {
+    public ResponseEntity<InvitacionResponseDTO> aceptarInvitacion(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
         try {
-            InvitacionEntity invitacion = invitacionService.aceptarInvitacion(id);
+            InvitacionEntity invitacion = invitacionService.aceptarInvitacion(id, solicitante);
             return ResponseEntity.ok(entityToDTO(invitacion));
-        } catch (RuntimeException e) {
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).build();
         }
     }
 
     @PutMapping("/{id}/rechazar")
-    public ResponseEntity<InvitacionResponseDTO> rechazarInvitacion(@PathVariable Long id) {
+    public ResponseEntity<InvitacionResponseDTO> rechazarInvitacion(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
         try {
-            InvitacionEntity invitacion = invitacionService.rechazarInvitacion(id);
+            InvitacionEntity invitacion = invitacionService.rechazarInvitacion(id, solicitante);
             return ResponseEntity.ok(entityToDTO(invitacion));
-        } catch (RuntimeException e) {
+        } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).build();
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarInvitacion(@PathVariable Long id) {
-        invitacionService.eliminarInvitacion(id);
+    public ResponseEntity<Void> eliminarInvitacion(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
+        try {
+            invitacionService.eliminarInvitacion(id, solicitante);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).build();
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -150,15 +172,10 @@ public class InvitacionController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        String uid = FirebaseRequestContext.requireUid(request);
-        Optional<UsuarioEntity> usuario = userService.buscarPorFirebaseUid(uid);
-
-        if (usuario.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
 
         try {
-            InvitacionEntity invitacion = invitacionService.marcarReservaComoPagada(id, usuario.get());
+            InvitacionEntity invitacion = invitacionService.marcarReservaComoPagada(id, usuario);
             return ResponseEntity.ok(entityToDTO(invitacion));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage()));

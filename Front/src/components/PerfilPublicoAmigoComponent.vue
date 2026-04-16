@@ -23,8 +23,7 @@ const resumenVotacion = ref({
 })
 
 const expandedSections = ref({
-  basic: true,
-  futbolista: false,
+  ficha: true,
   stats: true,
 })
 
@@ -45,22 +44,6 @@ const tendenciaLabel = computed(() => {
   if (playStyle === 'O') return 'Ofensiva'
   if (playStyle === 'D') return 'Defensiva'
   return 'Adaptable'
-})
-
-const nivelVisibleTexto = computed(() => {
-  const raw = Number(usuario.value?.nivelVisible)
-  if (!Number.isFinite(raw)) return '0.00'
-  return raw.toFixed(2)
-})
-
-const fiabilidadLabelTexto = computed(() => {
-  return usuario.value?.fiabilidadLabel || 'MEDIA'
-})
-
-const fiabilidadLabelClase = computed(() => {
-  if (fiabilidadLabelTexto.value === 'ALTA') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-  if (fiabilidadLabelTexto.value === 'BAJA') return 'bg-rose-100 text-rose-800 border-rose-200'
-  return 'bg-amber-100 text-amber-800 border-amber-200'
 })
 
 const partidosJugados = computed(() => {
@@ -248,6 +231,24 @@ const marcadorEntero = (valor) => {
   return Number.isFinite(numero) ? Math.round(numero) : 0
 }
 
+const mostrarAmbosResultados = (partido) => {
+  return Boolean(partido?.mostrarAmbosResultados)
+}
+
+const resultadoBaseLabel = (partido) => {
+  const golesA = partido?.golesBaseEquipoA
+  const golesB = partido?.golesBaseEquipoB
+  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Base: -'
+  return `Base: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
+}
+
+const resultadoConsensuadoLabel = (partido) => {
+  const golesA = partido?.golesConsensuadoEquipoA
+  const golesB = partido?.golesConsensuadoEquipoB
+  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Consensuado: -'
+  return `Consensuado: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
+}
+
 const formatearResultado = (resultado) => {
   const map = {
     VICTORIA: 'Victoria',
@@ -337,51 +338,19 @@ onMounted(cargarPerfil)
 
     <template v-else>
       <section class="card-surface">
-        <button type="button" @click="toggleSection('basic')" class="w-full px-4 py-3 flex items-center justify-between text-left">
+        <button type="button" @click="toggleSection('ficha')" class="w-full px-4 py-3 flex items-center justify-between text-left">
           <div>
-            <h3 class="text-base font-semibold text-slate-800">Información básica</h3>
-            <p class="text-xs text-slate-500">Nombre, bio y métricas visibles</p>
+            <h3 class="text-base font-semibold text-slate-800">Ficha de jugador</h3>
+            <p class="text-xs text-slate-500">{{ tendenciaLabel }} · {{ posicionPreferidaLabel }}</p>
           </div>
-          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.basic ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.ficha ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
         </button>
-        <div v-if="expandedSections.basic" class="px-4 pb-4 border-t border-slate-100">
+        <div v-if="expandedSections.ficha" class="px-4 pb-4 border-t border-slate-100">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mt-3">
             <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
               <p class="text-xs text-slate-600 font-semibold">Nombre</p>
               <p class="text-base font-bold text-slate-900">{{ usuario?.nombre || '-' }}</p>
             </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Nivel visible</p>
-              <p class="text-base font-bold text-slate-900">{{ nivelVisibleTexto }}</p>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-xs text-slate-600 font-semibold">Bio</p>
-              <p class="text-sm font-medium text-slate-900">{{ usuario?.bio || 'Sin bio' }}</p>
-            </div>
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 md:col-span-3">
-              <p class="text-xs text-slate-600 font-semibold">Fiabilidad del perfil</p>
-              <span :class="['inline-flex mt-1 items-center rounded-full border px-2.5 py-1 text-xs font-semibold', fiabilidadLabelClase]">
-                {{ fiabilidadLabelTexto }}
-              </span>
-            </div>
-          </div>
-
-          <p class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900 mt-3">
-            El nivel visible y la fiabilidad se calculan con datos reales de partidos y votaciones válidas.
-          </p>
-        </div>
-      </section>
-
-      <section class="card-surface">
-        <button type="button" @click="toggleSection('futbolista')" class="w-full px-4 py-3 flex items-center justify-between text-left">
-          <div>
-            <h3 class="text-base font-semibold text-slate-800">Perfil futbolista</h3>
-            <p class="text-xs text-slate-500">Tendencia y posición preferida</p>
-          </div>
-          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="expandedSections.futbolista ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-        </button>
-        <div v-if="expandedSections.futbolista" class="px-4 pb-4 border-t border-slate-100">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-3">
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p class="text-xs text-blue-700 font-semibold">Tendencia</p>
               <p class="text-base font-bold text-blue-900">{{ tendenciaLabel }}</p>
@@ -513,8 +482,12 @@ onMounted(cargarPerfil)
                     <p class="text-xs md:text-sm opacity-90 truncate">{{ formatearFecha(partido.fecha) }}</p>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <p class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-white/20 text-white border border-white/40">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
+                    <div v-if="mostrarAmbosResultados(partido)" class="text-right leading-tight">
+                      <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoBaseLabel(partido) }}</p>
+                      <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoConsensuadoLabel(partido) }}</p>
+                    </div>
+                    <p v-else class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-slate-300 text-slate-900 border border-slate-400">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>
                   </div>
                 </article>
               </div>

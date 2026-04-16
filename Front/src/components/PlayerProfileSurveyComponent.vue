@@ -15,7 +15,7 @@ const profileStore = usePlayerProfileStore()
 const form = ref({
   playStyle: 'A',
   posicionPreferida: 'MEDIOCAMPISTA',
-  bio: '',
+  selfAssessment: 3,
 })
 
 const uiState = ref({
@@ -29,10 +29,21 @@ const stepSequence = [1, 2, 3]
 const stepDescription = computed(() => {
   const descs = {
     1: 'Elige tu tendencia de juego inicial.',
-    2: 'Define tu posición preferida y tu bio (opcional).',
-    3: 'Confirma tu perfil inicial. El nivel real se ajusta con partidos.',
+    2: 'Define tu posición preferida y autovaloración.',
+    3: 'Confirma tu perfil inicial. La autovaloración solo ajusta el arranque.',
   }
   return descs[uiState.value.step]
+})
+
+const selfAssessmentLabel = computed(() => {
+  const labels = {
+    1: 'Muy baja',
+    2: 'Baja',
+    3: 'Media',
+    4: 'Alta',
+    5: 'Muy alta',
+  }
+  return labels[form.value.selfAssessment] || 'Media'
 })
 
 const tendenciaLabel = computed(() => {
@@ -61,8 +72,8 @@ const loadExistingProfile = async () => {
   if (perfil?.attributes?.posicionPreferida) {
     form.value.posicionPreferida = perfil.attributes.posicionPreferida
   }
-  if (resumen?.bio) {
-    form.value.bio = resumen.bio
+  if (Number.isFinite(Number(perfil?.attributes?.selfAssessment))) {
+    form.value.selfAssessment = Number(perfil.attributes.selfAssessment)
   }
 }
 
@@ -89,8 +100,8 @@ const validateProfile = () => {
   if (!['DELANTERO', 'MEDIOCAMPISTA', 'DEFENSA', 'PORTERO'].includes(form.value.posicionPreferida)) {
     return 'Posición preferida inválida.'
   }
-  if ((form.value.bio || '').length > 400) {
-    return 'La bio no puede superar 400 caracteres.'
+  if (![1, 2, 3, 4, 5].includes(Number(form.value.selfAssessment))) {
+    return 'Autovaloración inválida.'
   }
   return ''
 }
@@ -110,13 +121,14 @@ const guardarPerfil = async () => {
       goalkeeper: form.value.posicionPreferida === 'PORTERO' || form.value.playStyle === 'G',
       posicionPreferida: form.value.posicionPreferida,
       playStyle: form.value.playStyle,
+      selfAssessment: Number(form.value.selfAssessment),
     },
   }
 
   try {
     const [result] = await Promise.all([
       profileStore.guardarMiPerfil(payload),
-      apiService.upsertPerfil(authStore.user?.displayName || authStore.user?.name || '', authStore.user?.email, form.value.bio || ''),
+      apiService.upsertPerfil(authStore.user?.displayName || authStore.user?.name || '', authStore.user?.email),
     ])
 
     if (!result.success) {
@@ -186,15 +198,23 @@ onMounted(() => {
             </div>
 
             <div>
-              <label class="block text-sm font-semibold text-slate-900 mb-1.5">Bio (opcional)</label>
-              <textarea
-                v-model="form.bio"
-                maxlength="400"
-                rows="4"
-                class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm"
-                placeholder="Cuéntanos brevemente cómo juegas..."
-              />
-              <p class="text-xs text-slate-500 mt-1">{{ (form.bio || '').length }}/400</p>
+              <label class="block text-sm font-semibold text-slate-900 mb-1.5">Autovaloración inicial</label>
+              <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                <input
+                  v-model.number="form.selfAssessment"
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  class="w-full accent-lime-400"
+                />
+                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>1 · Muy baja</span>
+                  <span class="font-semibold text-slate-800">{{ form.selfAssessment }} · {{ selfAssessmentLabel }}</span>
+                  <span>5 · Muy alta</span>
+                </div>
+                <p class="mt-1 text-xs text-slate-600">Solo afecta ligeramente al punto de partida del nivel.</p>
+              </div>
             </div>
           </div>
         </template>
@@ -210,11 +230,15 @@ onMounted(() => {
                 <span class="text-slate-600">Posición preferida:</span>
                 <span class="font-semibold text-slate-900">{{ posicionLabel }}</span>
               </div>
+              <div class="flex justify-between mt-1.5">
+                <span class="text-slate-600">Autovaloración:</span>
+                <span class="font-semibold text-slate-900">{{ form.selfAssessment }} · {{ selfAssessmentLabel }}</span>
+              </div>
             </div>
 
             <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-900">
               <p class="font-semibold">Cómo funciona el nivel</p>
-              <p class="mt-1">Tu nivel visible y fiabilidad se ajustan automáticamente partido a partido usando rendimiento real, calidad del partido y votaciones válidas.</p>
+              <p class="mt-1">Tu autovaloración solo ajusta ligeramente el inicio. El nivel visible y la fiabilidad se corrigen automáticamente partido a partido con rendimiento real, calidad y votaciones válidas.</p>
             </div>
           </div>
         </template>

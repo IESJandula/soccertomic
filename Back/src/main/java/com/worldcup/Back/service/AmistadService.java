@@ -49,12 +49,15 @@ public class AmistadService {
     }
 
     @Transactional
-    public AmistadEntity aceptarSolicitud(Long amistadId) {
+    public AmistadEntity aceptarSolicitud(Long amistadId, UsuarioEntity actor) {
         Optional<AmistadEntity> amistad = amistadRepository.findById(amistadId);
         if (amistad.isPresent()) {
             AmistadEntity a = amistad.get();
             if (a.getEstado() != EstadoAmistad.SOLICITADA) {
                 throw new BusinessException("Solo se pueden aceptar solicitudes pendientes");
+            }
+            if (actor == null || actor.getId() == null || a.getUsuarioB() == null || a.getUsuarioB().getId() == null || !a.getUsuarioB().getId().equals(actor.getId())) {
+                throw new RuntimeException("Solo la persona destinataria puede aceptar o rechazar la solicitud");
             }
             a.setEstado(EstadoAmistad.ACEPTADA);
             a.setAceptadaEn(LocalDateTime.now());
@@ -64,12 +67,15 @@ public class AmistadService {
     }
 
     @Transactional
-    public AmistadEntity rechazarSolicitud(Long amistadId) {
+    public AmistadEntity rechazarSolicitud(Long amistadId, UsuarioEntity actor) {
         Optional<AmistadEntity> amistad = amistadRepository.findById(amistadId);
         if (amistad.isPresent()) {
             AmistadEntity a = amistad.get();
             if (a.getEstado() != EstadoAmistad.SOLICITADA) {
                 throw new BusinessException("Solo se pueden rechazar solicitudes pendientes");
+            }
+            if (actor == null || actor.getId() == null || a.getUsuarioB() == null || a.getUsuarioB().getId() == null || !a.getUsuarioB().getId().equals(actor.getId())) {
+                throw new RuntimeException("Solo la persona destinataria puede aceptar o rechazar la solicitud");
             }
             a.setEstado(EstadoAmistad.RECHAZADA);
             return amistadRepository.save(a);
@@ -92,7 +98,19 @@ public class AmistadService {
     }
 
     @Transactional
-    public void eliminarAmistad(Long amistadId) {
-        amistadRepository.deleteById(amistadId);
+    public void eliminarAmistad(Long amistadId, UsuarioEntity actor) {
+        AmistadEntity amistad = amistadRepository.findById(amistadId)
+                .orElseThrow(() -> new ResourceNotFoundException("Amistad", amistadId));
+
+        boolean esParticipante = actor != null
+                && actor.getId() != null
+                && ((amistad.getUsuarioA() != null && amistad.getUsuarioA().getId() != null && amistad.getUsuarioA().getId().equals(actor.getId()))
+                || (amistad.getUsuarioB() != null && amistad.getUsuarioB().getId() != null && amistad.getUsuarioB().getId().equals(actor.getId())));
+
+        if (!esParticipante) {
+            throw new RuntimeException("Solo las personas implicadas pueden eliminar la amistad");
+        }
+
+        amistadRepository.delete(amistad);
     }
 }
