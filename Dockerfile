@@ -15,4 +15,4 @@ RUN npm install -g pnpm && \
 # Servir la app construida
 EXPOSE 5173
 
-CMD ["pnpm", "dlx", "serve", "-s", "dist", "-l", "0.0.0.0:5173"]
+CMD ["pnpm", "dlx", "serve", "-s", "dist", "-l", "tcp://0.0.0.0:5173"]
