@@ -1,3 +1,6 @@
+[provider]
+name = "node"
+
 [build]
 buildCmd = "cd Front && pnpm install --frozen-lockfile && pnpm build"
 
