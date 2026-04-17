@@ -1,0 +1,6 @@
+[build]
+dir = "Front"
+cmds = ["pnpm install --frozen-lockfile", "pnpm build"]
+
+[start]
+cmd = "pnpm dlx serve -s dist -l 5173"
