@@ -6,7 +6,6 @@ import { useUiStore } from '../stores/ui'
 import { useNotificationsStore } from '../stores/notifications'
 import AppShell from './ui/AppShell.vue'
 import AppIcon from './ui/AppIcon.vue'
-import BaseButton from './ui/BaseButton.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -130,9 +129,29 @@ watch(
         </button>
 
         <!-- Botón de cerrar sesión -->
-        <BaseButton variant="info" size="sm" @click="handleLogout">
-          Cerrar sesión
-        </BaseButton>
+        <button
+          type="button"
+          @click="handleLogout"
+          class="inline-flex items-center gap-2 bg-transparent border-0 text-white px-1 py-1 text-sm font-medium hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-focus)] rounded-md"
+          aria-label="Cerrar sesión"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <path d="M16 17l5-5-5-5" />
+            <path d="M21 12H9" />
+          </svg>
+          <span>Cerrar sesión</span>
+        </button>
       </div>
     </template>
 

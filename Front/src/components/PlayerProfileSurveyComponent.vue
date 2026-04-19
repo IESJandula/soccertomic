@@ -1,11 +1,12 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { usePlayerProfileStore } from '../stores/playerProfile'
 import apiService from '../services/apiService'
 import BaseButton from './ui/BaseButton.vue'
 import PlaystyleSelector from './survey/PlaystyleSelector.vue'
+import AttributeSlider from './survey/AttributeSlider.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,6 +35,9 @@ const stepDescription = computed(() => {
   }
   return descs[uiState.value.step]
 })
+
+const isGoalkeeperTrend = computed(() => form.value.playStyle === 'G')
+const canChooseGoalkeeperPosition = computed(() => ['G', 'A'].includes(form.value.playStyle))
 
 const selfAssessmentLabel = computed(() => {
   const labels = {
@@ -76,6 +80,21 @@ const loadExistingProfile = async () => {
     form.value.selfAssessment = Number(perfil.attributes.selfAssessment)
   }
 }
+
+watch(
+  () => form.value.playStyle,
+  (playStyle) => {
+    if (playStyle === 'G') {
+      form.value.posicionPreferida = 'PORTERO'
+      return
+    }
+
+    if (!canChooseGoalkeeperPosition.value && form.value.posicionPreferida === 'PORTERO') {
+      form.value.posicionPreferida = 'MEDIOCAMPISTA'
+    }
+  },
+  { immediate: true }
+)
 
 const nextStep = () => {
   const idx = stepSequence.indexOf(uiState.value.step)
@@ -189,31 +208,34 @@ onMounted(() => {
           <div class="space-y-3">
             <div>
               <label class="block text-sm font-semibold text-slate-900 mb-1.5">Posición preferida (opcional)</label>
-              <select v-model="form.posicionPreferida" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm">
+              <select
+                v-model="form.posicionPreferida"
+                :disabled="isGoalkeeperTrend"
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm disabled:cursor-not-allowed disabled:opacity-80"
+              >
                 <option value="DELANTERO">Delantero</option>
                 <option value="MEDIOCAMPISTA">Mediocampista</option>
                 <option value="DEFENSA">Defensa</option>
-                <option value="PORTERO">Portero</option>
+                <option v-if="canChooseGoalkeeperPosition" value="PORTERO">Portero</option>
               </select>
+              <p v-if="isGoalkeeperTrend" class="mt-1 text-xs text-slate-500">Tendencia Portero seleccionada: posición preferida bloqueada en Portero.</p>
             </div>
 
             <div>
-              <label class="block text-sm font-semibold text-slate-900 mb-1.5">Autovaloración inicial</label>
               <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                <input
-                  v-model.number="form.selfAssessment"
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  class="w-full accent-lime-400"
+                <AttributeSlider
+                  :model-value="form.selfAssessment"
+                  label="Autovaloración inicial"
+                  :min="1"
+                  :max="5"
+                  :step="1"
+                  low-label="1 · Muy baja"
+                  high-label="5 · Muy alta"
+                  @update:model-value="form.selfAssessment = $event"
                 />
-                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
-                  <span>1 · Muy baja</span>
-                  <span class="font-semibold text-slate-800">{{ form.selfAssessment }} · {{ selfAssessmentLabel }}</span>
-                  <span>5 · Muy alta</span>
+                <div class="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-center">
+                  <p class="text-lg font-bold text-slate-800">{{ form.selfAssessment }} · {{ selfAssessmentLabel }}</p>
                 </div>
-                <p class="mt-1 text-xs text-slate-600">Solo afecta ligeramente al punto de partida del nivel.</p>
               </div>
             </div>
           </div>
@@ -236,10 +258,6 @@ onMounted(() => {
               </div>
             </div>
 
-            <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-900">
-              <p class="font-semibold">Cómo funciona el nivel</p>
-              <p class="mt-1">Tu autovaloración solo ajusta ligeramente el inicio. El nivel visible y la fiabilidad se corrigen automáticamente partido a partido con rendimiento real, calidad y votaciones válidas.</p>
-            </div>
           </div>
         </template>
 

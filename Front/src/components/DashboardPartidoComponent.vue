@@ -1114,7 +1114,7 @@ const cerrarModalDiscusionResultado = () => {
               </div>
               <div v-if="!partido.equipoA || partido.equipoA.length === 0" class="text-xs" :style="teamAColor.subtitleStyle">Sin jugadores</div>
               <div v-else class="space-y-1.5">
-                <div v-for="jugador in partido.equipoA" :key="`voto-a-${jugador.id}`" class="rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5" :style="teamAColor.playerRowStyle">
+                <div v-for="jugador in partido.equipoA" :key="`voto-a-${jugador.id}`" :class="['rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5', esUsuarioActual(jugador.id) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : '']" :style="teamAColor.playerRowStyle">
                   <span class="inline-flex items-center gap-1 text-xs font-medium truncate" :style="teamAColor.titleStyle">
                     <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada"><AppIcon name="check" :size="10" /></span>
                     <span>{{ jugador.nombre }}</span>
@@ -1200,7 +1200,7 @@ const cerrarModalDiscusionResultado = () => {
               </div>
               <div v-if="!partido.equipoB || partido.equipoB.length === 0" class="text-xs" :style="teamBColor.subtitleStyle">Sin jugadores</div>
               <div v-else class="space-y-1.5">
-                <div v-for="jugador in partido.equipoB" :key="`voto-b-${jugador.id}`" class="rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5" :style="teamBColor.playerRowStyle">
+                <div v-for="jugador in partido.equipoB" :key="`voto-b-${jugador.id}`" :class="['rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5', esUsuarioActual(jugador.id) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : '']" :style="teamBColor.playerRowStyle">
                   <span class="inline-flex items-center gap-1 text-xs font-medium truncate" :style="teamBColor.titleStyle">
                     <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada"><AppIcon name="check" :size="10" /></span>
                     <span>{{ jugador.nombre }}</span>
@@ -1332,7 +1332,7 @@ const cerrarModalDiscusionResultado = () => {
                 <span
                   v-for="jugador in diferencialesResumen"
                   :key="jugador.jugadorId"
-                  class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
+                  :class="['inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs', esUsuarioActual(jugador.jugadorId) ? 'border-[color:var(--color-primary)] bg-[color:rgba(151,240,125,0.2)] text-[color:var(--color-secondary)] shadow-[0_0_0_1px_rgba(151,240,125,0.45)]' : 'border-amber-200 bg-amber-50 text-amber-800']"
                 >
                   <span class="truncate max-w-[120px]">{{ jugador.jugadorNombre }}</span>
                   <span class="font-bold">{{ jugador.votos }}</span>
@@ -1383,7 +1383,7 @@ const cerrarModalDiscusionResultado = () => {
                 <span
                   v-for="jugador in diferencialesResumen"
                   :key="jugador.jugadorId"
-                  class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
+                  :class="['inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs', esUsuarioActual(jugador.jugadorId) ? 'border-[color:var(--color-primary)] bg-[color:rgba(151,240,125,0.2)] text-[color:var(--color-secondary)] shadow-[0_0_0_1px_rgba(151,240,125,0.45)]' : 'border-amber-200 bg-amber-50 text-amber-800']"
                 >
                   <span class="truncate max-w-[120px]">{{ jugador.jugadorNombre }}</span>
                   <span class="font-bold">{{ jugador.votos }}</span>

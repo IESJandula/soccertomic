@@ -230,6 +230,22 @@ const rolIcono = (partido) => {
   return null
 }
 
+const obtenerNombreOrganizador = (partido) => {
+  // Prioridad: owner > creador > organizador OWNER > primer organizador > fallback
+  if (partido?.owner?.nombre) return partido.owner.nombre
+  if (partido?.creador?.nombre) return partido.creador.nombre
+
+  const organizadores = partido?.organizadores || []
+  const ownerOrg = organizadores.find((o) => o.rol === 'OWNER')
+  if (ownerOrg?.usuario?.nombre) return ownerOrg.usuario.nombre
+
+  if (organizadores.length > 0 && organizadores[0]?.usuario?.nombre) {
+    return organizadores[0].usuario.nombre
+  }
+
+  return '—'
+}
+
 const isReservationState = (estado) => estado === 'CONFIRMADO' || estado === 'RESERVADA'
 const isInGameStatus = (estado) => estado === 'EN_JUEGO' || estado === 'EN_CURSO'
 const isOrganizingStatus = (estado) => estado === 'CREADO' || estado === 'BORRADOR'
@@ -846,7 +862,7 @@ const eliminarPartido = async (partido) => {
                     <span class="inline-flex items-center gap-1.5"><AppIcon name="users" :size="14" />{{ totalJugadores(partido) }}/{{ cupoTotal(partido) }} personas</span>
                   </div>
 
-                  <p class="text-sm text-slate-600">Organiza: {{ partido.owner?.nombre || '—' }}</p>
+                  <p class="text-sm text-slate-600">Organiza: {{ obtenerNombreOrganizador(partido) }}</p>
 
                   <div class="grid grid-cols-2 gap-2">
                     <BaseButton :variant="puedeVerDetalle(partido) ? 'secondary' : 'danger'" block :disabled="!puedeVerDetalle(partido)" @click="irAPartido(partido.id)">
@@ -983,7 +999,7 @@ const eliminarPartido = async (partido) => {
               <span class="inline-flex items-center gap-1.5"><AppIcon name="users" :size="14" />{{ totalJugadores(partido) }}/{{ cupoTotal(partido) }} personas</span>
             </div>
 
-            <p class="text-sm text-slate-600">Organiza: {{ partido.owner?.nombre || '—' }}</p>
+            <p class="text-sm text-slate-600">Organiza: {{ obtenerNombreOrganizador(partido) }}</p>
 
             <div class="grid grid-cols-2 gap-2">
               <BaseButton :variant="puedeVerDetalle(partido) ? 'secondary' : 'danger'" block :disabled="!puedeVerDetalle(partido)" @click="irAPartido(partido.id)">
@@ -1192,7 +1208,7 @@ const eliminarPartido = async (partido) => {
                     <p class="text-2xl font-bold text-slate-700">{{ totalJugadores(partido) }}/{{ cupoTotal(partido) }}</p>
                   </div>
 
-                  <p class="text-sm text-slate-600">Organiza: {{ partido.owner?.nombre || '—' }}</p>
+                  <p class="text-sm text-slate-600">Organiza: {{ obtenerNombreOrganizador(partido) }}</p>
 
                   <div class="grid grid-cols-2 gap-2 mt-auto">
                     <BaseButton :variant="puedeVerDetalle(partido) ? 'secondary' : 'danger'" block :disabled="!puedeVerDetalle(partido)" @click="irAPartido(partido.id)">
@@ -1313,7 +1329,7 @@ const eliminarPartido = async (partido) => {
               <p class="text-2xl font-bold text-slate-700">{{ totalJugadores(partido) }}/{{ cupoTotal(partido) }}</p>
             </div>
 
-            <p class="text-sm text-slate-600">Organiza: {{ partido.owner?.nombre || '—' }}</p>
+            <p class="text-sm text-slate-600">Organiza: {{ obtenerNombreOrganizador(partido) }}</p>
 
             <div class="grid grid-cols-2 gap-2 mt-auto">
               <BaseButton :variant="puedeVerDetalle(partido) ? 'secondary' : 'danger'" block :disabled="!puedeVerDetalle(partido)" @click="irAPartido(partido.id)">

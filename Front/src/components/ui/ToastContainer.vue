@@ -15,7 +15,7 @@ const classesByType = {
 const textClassesByType = {
   'login-success': 'toast-lime-text',
   'join-success': 'toast-lime-text',
-  success: 'text-slate-900',
+  success: 'toast-lime-text',
   error: 'text-slate-100',
   warning: 'text-slate-100',
   info: 'text-slate-100',
@@ -24,17 +24,21 @@ const textClassesByType = {
 const closeClassesByType = {
   'login-success': 'toast-lime-close',
   'join-success': 'toast-lime-close',
-  success: 'text-slate-900/90 hover:text-slate-900',
+  success: 'toast-lime-close',
   error: 'text-slate-100/90 hover:text-slate-100',
   warning: 'text-slate-100/90 hover:text-slate-100',
   info: 'text-slate-100/90 hover:text-slate-100',
 }
 
 const textStyleByType = {
+  'login-success': { color: '#02040b' },
+  'join-success': { color: '#02040b' },
   success: { color: '#02040b' },
 }
 
 const closeStyleByType = {
+  'login-success': { color: '#02040b' },
+  'join-success': { color: '#02040b' },
   success: { color: '#02040b' },
 }
 </script>

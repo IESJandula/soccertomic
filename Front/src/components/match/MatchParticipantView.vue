@@ -36,7 +36,7 @@
           :class="[
             'flex items-center gap-2.5 p-2.5 rounded-lg hover:shadow-md transition-shadow border-2',
             isCurrentUser(jugador)
-              ? 'bg-white border-black'
+              ? 'bg-white border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]'
               : 'bg-white border-amber-200'
           ]"
         >
@@ -93,7 +93,7 @@
             :key="`equipo-a-${jugador.id}`"
             :class="[
               'rounded-lg p-2.5 border-2 flex items-center gap-2.5',
-              String(jugador.id) === String(currentUserId) ? 'border-black' : ''
+              String(jugador.id) === String(currentUserId) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : ''
             ]"
             :style="teamAColor.playerRowStyle"
           >
@@ -110,7 +110,7 @@
                 <span
                   v-if="getRolEmoji(jugador)"
                   class="ml-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                  :style="teamAColor.auraStyle"
+                  :style="String(jugador.id) === String(currentUserId) ? teamAColor.auraStyle : {}"
                   :title="getRolTitle(jugador)"
                 >
                   <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" :style="teamAColor.iconStyle" /></span>
@@ -149,7 +149,7 @@
             :key="`equipo-b-${jugador.id}`"
             :class="[
               'rounded-lg p-2.5 border-2 flex items-center gap-2.5',
-              String(jugador.id) === String(currentUserId) ? 'border-black' : ''
+              String(jugador.id) === String(currentUserId) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : ''
             ]"
             :style="teamBColor.playerRowStyle"
           >
@@ -166,7 +166,7 @@
                 <span
                   v-if="getRolEmoji(jugador)"
                   class="ml-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                  :style="teamBColor.auraStyle"
+                  :style="String(jugador.id) === String(currentUserId) ? teamBColor.auraStyle : {}"
                   :title="getRolTitle(jugador)"
                 >
                   <span class="inline-flex items-center"><AppIcon :name="getRolEmoji(jugador)" :size="12" :style="teamBColor.iconStyle" /></span>
