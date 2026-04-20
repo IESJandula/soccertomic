@@ -42,6 +42,8 @@ export const ENDPOINTS = {
   EQUIPOS_RAPIDOS_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/mis-equipos`,
   EQUIPO_INVITACIONES: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones`,
   EQUIPO_INVITACIONES_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/invitaciones/mis-invitaciones`,
+  EQUIPOS_RAPIDOS_NOTIFICACIONES: `${CORE_API_BASE_URL}/api/equipos-rapidos/notificaciones`,
+  EQUIPOS_RAPIDOS_NOTIFICACIONES_MIS: `${CORE_API_BASE_URL}/api/equipos-rapidos/notificaciones/mis-notificaciones`,
 
   // ============ AMISTADES ============
   AMISTADES: `${CORE_API_BASE_URL}/api/amistades`,

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
@@ -28,6 +28,12 @@ const misEquiposDesplegados = ref(true)
 const creandoEquipo = ref(false)
 const guardandoEquipo = ref(false)
 const eliminandoEquipoId = ref(null)
+const equipoGestionandoId = ref(null)
+const modoGestionEquipo = ref(null)
+const guardandoGestionEquipo = ref(false)
+const equipoGestionNombre = ref('')
+const equipoGestionCapacidad = ref(7)
+const usuarioGestionandoId = ref(null)
 const nombreEquipoRapido = ref('')
 const capacidadEquipoRapido = ref(7)
 const miembrosEquipoSeleccionados = ref([])
@@ -49,15 +55,140 @@ const toggleMisEquipos = () => {
   misEquiposDesplegados.value = !misEquiposDesplegados.value
 }
 
+const isEquipoOwner = (equipo) => equipo.owner?.id === authStore.user?.id
+
+const equipoEnEdicion = (equipoId, modo) => equipoGestionandoId.value === equipoId && modoGestionEquipo.value === modo
+
+const limpiarGestionEquipo = () => {
+  equipoGestionandoId.value = null
+  modoGestionEquipo.value = null
+  guardandoGestionEquipo.value = false
+  equipoGestionNombre.value = ''
+  equipoGestionCapacidad.value = 7
+  usuarioGestionandoId.value = null
+}
+
+const abrirEdicionEquipo = (equipo) => {
+  equipoGestionandoId.value = equipo.id
+  modoGestionEquipo.value = 'editar'
+  equipoGestionNombre.value = equipo.nombre
+  equipoGestionCapacidad.value = Number(equipo.capacidad || 7)
+}
+
+const abrirAgregarMiembros = (equipo) => {
+  equipoGestionandoId.value = equipo.id
+  modoGestionEquipo.value = 'agregar'
+}
+
+const abrirGestionMiembros = (equipo) => {
+  equipoGestionandoId.value = equipo.id
+  modoGestionEquipo.value = 'miembros'
+}
+
+const cancelarGestionEquipo = () => {
+  limpiarGestionEquipo()
+}
+
+const miembrosDisponiblesParaEquipo = (equipo) => {
+  const miembrosIds = new Set((equipo.miembros || []).map((m) => m.id))
+  return amigos.value.filter((amistad) => {
+    const usuario = getOtroUsuario(amistad)
+    return usuario.id !== authStore.user?.id && !miembrosIds.has(usuario.id)
+  })
+}
+
+const guardarEdicionEquipo = async () => {
+  if (!equipoGestionandoId.value) return
+  if (!equipoGestionNombre.value.trim()) {
+    uiStore.showToast({ message: 'Indica un nombre para el equipo.', type: 'error' })
+    return
+  }
+
+  guardandoGestionEquipo.value = true
+  try {
+    await amistadService.actualizarEquipoRapido(
+      equipoGestionandoId.value,
+      equipoGestionNombre.value.trim(),
+      Number(equipoGestionCapacidad.value)
+    )
+    await cargarMisEquipos()
+    window.dispatchEvent(new CustomEvent('soccertomic:teams-updated'))
+    uiStore.showToast({ message: 'Equipo actualizado.', type: 'success' })
+    limpiarGestionEquipo()
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'No se pudo actualizar el equipo.', type: 'error' })
+  } finally {
+    guardandoGestionEquipo.value = false
+  }
+}
+
+const agregarMiembroEquipo = async (equipo, usuarioId) => {
+  if (!equipoGestionandoId.value) return
+  usuarioGestionandoId.value = usuarioId
+  try {
+    await amistadService.agregarMiembroEquipo(equipo.id, usuarioId)
+    await cargarMisEquipos()
+    window.dispatchEvent(new CustomEvent('soccertomic:teams-updated'))
+    uiStore.showToast({ message: 'Miembro agregado al equipo.', type: 'success' })
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'No se pudo agregar el miembro.', type: 'error' })
+  } finally {
+    usuarioGestionandoId.value = null
+  }
+}
+
+const quitarMiembroEquipo = async (equipo, usuarioId) => {
+  usuarioGestionandoId.value = usuarioId
+  try {
+    await amistadService.quitarMiembroEquipo(equipo.id, usuarioId)
+    await cargarMisEquipos()
+    window.dispatchEvent(new CustomEvent('soccertomic:teams-updated'))
+    uiStore.showToast({ message: 'Miembro expulsado del equipo.', type: 'success' })
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'No se pudo expulsar al miembro.', type: 'error' })
+  } finally {
+    usuarioGestionandoId.value = null
+  }
+}
+
+const salirDeEquipo = async (equipo) => {
+  const accepted = await uiStore.askConfirm({
+    title: 'Salir del equipo',
+    message: `¿Deseas salir de ${equipo.nombre}?`,
+    confirmLabel: 'Salir',
+    cancelLabel: 'Cancelar',
+    variant: 'danger',
+  })
+
+  if (!accepted) return
+
+  usuarioGestionandoId.value = authStore.user?.id
+  try {
+    await amistadService.salirDeEquipo(equipo.id)
+    await cargarMisEquipos()
+    window.dispatchEvent(new CustomEvent('soccertomic:teams-updated'))
+    uiStore.showToast({ message: 'Has salido del equipo.', type: 'success' })
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'No se pudo salir del equipo.', type: 'error' })
+  } finally {
+    usuarioGestionandoId.value = null
+  }
+}
+
 onMounted(async () => {
   try {
     await cargarAmigos()
     await cargarSolicitudesEnviadas()
     await cargarUltimasPersonas()
     await cargarMisEquipos()
+    window.addEventListener('soccertomic:teams-updated', cargarMisEquipos)
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('soccertomic:teams-updated', cargarMisEquipos)
 })
 
 const cargarAmigos = async () => {
@@ -481,13 +612,18 @@ const eliminarEquipoRapido = async (equipo) => {
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-            <article v-for="equipo in misEquipos" :key="equipo.id" class="border border-slate-200 rounded-xl p-3 space-y-2">
+            <article v-for="equipo in misEquipos" :key="equipo.id" class="border border-slate-200 rounded-xl p-3 space-y-3 bg-white">
               <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
+                <div class="min-w-0 space-y-1">
                   <p class="font-semibold text-slate-800 truncate">{{ equipo.nombre }}</p>
                   <p class="text-xs text-slate-500">Integrantes: {{ equipo.totalIntegrantes }}/{{ equipo.capacidad || 7 }}</p>
+                  <p class="text-xs inline-flex items-center rounded-full px-2 py-1" :class="isEquipoOwner(equipo) ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'">
+                    {{ isEquipoOwner(equipo) ? 'Organizador' : 'Miembro' }}
+                  </p>
                 </div>
+
                 <BaseButton
+                  v-if="isEquipoOwner(equipo)"
                   size="sm"
                   variant="danger"
                   :loading="eliminandoEquipoId === equipo.id"
@@ -495,6 +631,91 @@ const eliminarEquipoRapido = async (equipo) => {
                 >
                   Eliminar
                 </BaseButton>
+                <BaseButton
+                  v-else
+                  size="sm"
+                  variant="secondary"
+                  :loading="usuarioGestionandoId === authStore.user?.id"
+                  @click="salirDeEquipo(equipo)"
+                >
+                  Salir
+                </BaseButton>
+              </div>
+
+              <div class="flex flex-wrap gap-2" v-if="isEquipoOwner(equipo)">
+                <BaseButton size="sm" variant="secondary" @click="abrirEdicionEquipo(equipo)">Editar</BaseButton>
+                <BaseButton size="sm" variant="secondary" @click="abrirAgregarMiembros(equipo)">Agregar miembro</BaseButton>
+                <BaseButton size="sm" variant="secondary" @click="abrirGestionMiembros(equipo)">Expulsar miembro</BaseButton>
+              </div>
+
+              <div v-if="equipoEnEdicion(equipo.id, 'editar')" class="space-y-2 border-t border-slate-100 pt-3">
+                <BaseInput v-model="equipoGestionNombre" label="Nombre del equipo" placeholder="Nombre del equipo" />
+                <label class="block">
+                  <span class="block text-sm font-semibold text-slate-700 mb-1.5">Capacidad del equipo</span>
+                  <select
+                    v-model.number="equipoGestionCapacidad"
+                    class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
+                  >
+                    <option :value="2">2</option>
+                    <option :value="3">3</option>
+                    <option :value="4">4</option>
+                    <option :value="5">5</option>
+                    <option :value="6">6</option>
+                    <option :value="7">7</option>
+                  </select>
+                </label>
+                <div class="flex justify-end gap-2">
+                  <BaseButton size="sm" variant="secondary" @click="cancelarGestionEquipo">Cancelar</BaseButton>
+                  <BaseButton size="sm" :loading="guardandoGestionEquipo" @click="guardarEdicionEquipo">Guardar</BaseButton>
+                </div>
+              </div>
+
+              <div v-if="equipoEnEdicion(equipo.id, 'agregar')" class="space-y-2 border-t border-slate-100 pt-3">
+                <p class="text-xs font-semibold text-slate-700">Amistades disponibles</p>
+                <div v-if="miembrosDisponiblesParaEquipo(equipo).length === 0" class="text-xs text-slate-500">
+                  No hay amistades disponibles para agregar.
+                </div>
+                <div v-else class="flex flex-wrap gap-2">
+                  <BaseButton
+                    v-for="amistad in miembrosDisponiblesParaEquipo(equipo)"
+                    :key="`add-${equipo.id}-${getOtroUsuario(amistad).id}`"
+                    size="sm"
+                    variant="secondary"
+                    :loading="usuarioGestionandoId === getOtroUsuario(amistad).id"
+                    @click="agregarMiembroEquipo(equipo, getOtroUsuario(amistad).id)"
+                  >
+                    {{ getOtroUsuario(amistad).nombre }}
+                  </BaseButton>
+                </div>
+                <div class="flex justify-end">
+                  <BaseButton size="sm" variant="secondary" @click="cancelarGestionEquipo">Cerrar</BaseButton>
+                </div>
+              </div>
+
+              <div v-if="equipoEnEdicion(equipo.id, 'miembros')" class="space-y-2 border-t border-slate-100 pt-3">
+                <p class="text-xs font-semibold text-slate-700">Miembros del equipo</p>
+                <div v-if="(equipo.miembros || []).length === 0" class="text-xs text-slate-500">
+                  Todavía no hay miembros para expulsar.
+                </div>
+                <div v-else class="space-y-2">
+                  <div v-for="miembro in equipo.miembros" :key="`member-${equipo.id}-${miembro.id}`" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-slate-800 truncate">{{ miembro.nombre }}</p>
+                      <p class="text-xs text-slate-500 truncate">{{ miembro.email }}</p>
+                    </div>
+                    <BaseButton
+                      size="sm"
+                      variant="danger"
+                      :loading="usuarioGestionandoId === miembro.id"
+                      @click="quitarMiembroEquipo(equipo, miembro.id)"
+                    >
+                      Expulsar
+                    </BaseButton>
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <BaseButton size="sm" variant="secondary" @click="cancelarGestionEquipo">Cerrar</BaseButton>
+                </div>
               </div>
 
               <div class="text-xs text-slate-600">

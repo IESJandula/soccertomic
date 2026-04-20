@@ -7,10 +7,11 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const invitacionesPendientes = ref([])
   const notificacionesReserva = ref([])
   const solicitudesPendientes = ref([])
+  const notificacionesEquipo = ref([])
   const loading = ref(false)
 
   const totalNotificaciones = computed(() => {
-    return invitacionesPendientes.value.length + notificacionesReserva.value.length + solicitudesPendientes.value.length
+    return invitacionesPendientes.value.length + notificacionesReserva.value.length + solicitudesPendientes.value.length + notificacionesEquipo.value.length
   })
 
   const cargarNotificaciones = async () => {
@@ -20,10 +21,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
         invitacionService.obtenerMisInvitaciones(),
         amistadService.obtenerSolicitudesPendientes(),
       ])
+      const notificacionesEquipoRespuesta = await invitacionService.obtenerMisNotificacionesEquipo()
       const listaInvitaciones = invitaciones || []
       invitacionesPendientes.value = listaInvitaciones.filter(i => i.estado === 'PENDIENTE')
       notificacionesReserva.value = listaInvitaciones.filter(i => i.precioTotalPista !== null && i.precioTotalPista !== undefined && !Boolean(i.pagada))
       solicitudesPendientes.value = solicitudes || []
+      notificacionesEquipo.value = notificacionesEquipoRespuesta || []
     } catch (error) {
       console.error('Error cargando notificaciones:', error)
     } finally {
@@ -35,12 +38,14 @@ export const useNotificationsStore = defineStore('notifications', () => {
     invitacionesPendientes.value = []
     notificacionesReserva.value = []
     solicitudesPendientes.value = []
+    notificacionesEquipo.value = []
   }
 
   return {
     invitacionesPendientes,
     notificacionesReserva,
     solicitudesPendientes,
+    notificacionesEquipo,
     totalNotificaciones,
     loading,
     cargarNotificaciones,

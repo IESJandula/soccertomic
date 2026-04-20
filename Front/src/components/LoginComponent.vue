@@ -265,7 +265,7 @@ const handleRegisterEmailPassword = async () => {
       displayName: registerName.value.trim(),
     })
 
-    const result = await authStore.loginWithFirebaseToken(firebaseSession)
+    const result = await authStore.loginWithFirebaseToken(firebaseSession, true)
 
     if (!result.success) {
       registerError.value = result.message || 'No se pudo crear la cuenta'

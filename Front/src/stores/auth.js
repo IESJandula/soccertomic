@@ -87,14 +87,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const loginWithFirebaseToken = async ({ idToken, email, displayName }) => {
+  const loginWithFirebaseToken = async ({ idToken, email, displayName }, isRegistration = false) => {
     if (!idToken || !email) {
       return { success: false, message: 'Token y email son obligatorios para iniciar sesión' }
     }
 
     try {
       setAuthToken(idToken)
-      const nombre = String(displayName || email.split('@')[0] || 'Usuario').trim()
+      // Only persist displayName during signup; regular login must not overwrite custom names.
+      const nombre = isRegistration
+        ? String(displayName || email.split('@')[0] || 'Usuario').trim()
+        : null
       const response = await apiService.upsertPerfil(nombre, email)
       const newUser = hydrateSessionUser(response, email)
       user.value = newUser

@@ -41,6 +41,39 @@ class AmistadService {
     })
   }
 
+  async actualizarEquipoRapido(equipoId, nombre, capacidad) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS}/${equipoId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        nombre,
+        capacidad,
+        miembroIds: [],
+      }),
+      useCache: false,
+    })
+  }
+
+  async agregarMiembroEquipo(equipoId, usuarioId) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS}/${equipoId}/miembros?usuarioId=${usuarioId}`, {
+      method: 'POST',
+      useCache: false,
+    })
+  }
+
+  async quitarMiembroEquipo(equipoId, usuarioId) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS}/${equipoId}/miembros/${usuarioId}`, {
+      method: 'DELETE',
+      useCache: false,
+    })
+  }
+
+  async salirDeEquipo(equipoId) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS}/${equipoId}/salir`, {
+      method: 'POST',
+      useCache: false,
+    })
+  }
+
   async crearEquipoRapido(nombre, miembroIds = [], capacidad = 7) {
     return apiService.request(ENDPOINTS.EQUIPOS_RAPIDOS, {
       method: 'POST',

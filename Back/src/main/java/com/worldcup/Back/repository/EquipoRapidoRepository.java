@@ -12,8 +12,8 @@ import java.util.Optional;
 
 @Repository
 public interface EquipoRapidoRepository extends JpaRepository<EquipoRapidoEntity, Long> {
-    @Query("SELECT DISTINCT e FROM EquipoRapidoEntity e LEFT JOIN FETCH e.miembros WHERE e.owner = :owner ORDER BY e.actualizadoEn DESC")
-    List<EquipoRapidoEntity> findByOwnerOrderByActualizadoEnDesc(@Param("owner") UsuarioEntity owner);
+    @Query("SELECT DISTINCT e FROM EquipoRapidoEntity e LEFT JOIN FETCH e.miembros WHERE e.owner = :usuario OR :usuario MEMBER OF e.miembros ORDER BY e.actualizadoEn DESC")
+    List<EquipoRapidoEntity> findVisibleByUsuarioOrderByActualizadoEnDesc(@Param("usuario") UsuarioEntity usuario);
 
     @Query("SELECT e FROM EquipoRapidoEntity e LEFT JOIN FETCH e.miembros WHERE e.id = :id AND e.owner = :owner")
     Optional<EquipoRapidoEntity> findByIdAndOwner(@Param("id") Long id, @Param("owner") UsuarioEntity owner);

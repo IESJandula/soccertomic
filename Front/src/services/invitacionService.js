@@ -68,6 +68,20 @@ class InvitacionService {
     })
   }
 
+  async obtenerMisNotificacionesEquipo() {
+    return apiService.request(ENDPOINTS.EQUIPOS_RAPIDOS_NOTIFICACIONES_MIS, {
+      method: 'GET',
+      useCache: false,
+    })
+  }
+
+  async eliminarNotificacionEquipo(notificacionId) {
+    return apiService.request(`${ENDPOINTS.EQUIPOS_RAPIDOS_NOTIFICACIONES}/${notificacionId}`, {
+      method: 'DELETE',
+      useCache: false,
+    })
+  }
+
   async aceptarInvitacionEquipo(invitacionId) {
     const url = `${ENDPOINTS.EQUIPO_INVITACIONES}/${invitacionId}/aceptar`
     return apiService.request(url, {

@@ -71,4 +71,51 @@ public class EquipoRapidoController {
         equipoRapidoService.eliminarEquipoRapido(owner, equipoId);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{equipoId}")
+    public ResponseEntity<EquipoRapidoResponseDTO> actualizarEquipoRapido(
+            HttpServletRequest request,
+            @PathVariable Long equipoId,
+            @Valid @RequestBody EquipoRapidoRequestDTO body
+    ) {
+        UsuarioEntity owner = userService.obtenerOCrearDesdeRequest(request);
+
+        EquipoRapidoEntity actualizado = equipoRapidoService.actualizarEquipoRapido(owner, equipoId, body);
+        return ResponseEntity.ok(toDTO(actualizado));
+    }
+
+    @PostMapping("/{equipoId}/miembros")
+    public ResponseEntity<EquipoRapidoResponseDTO> agregarMiembro(
+            HttpServletRequest request,
+            @PathVariable Long equipoId,
+            @RequestParam Long usuarioId
+    ) {
+        UsuarioEntity owner = userService.obtenerOCrearDesdeRequest(request);
+
+        EquipoRapidoEntity actualizado = equipoRapidoService.agregarMiembro(owner, equipoId, usuarioId);
+        return ResponseEntity.ok(toDTO(actualizado));
+    }
+
+    @DeleteMapping("/{equipoId}/miembros/{usuarioId}")
+    public ResponseEntity<EquipoRapidoResponseDTO> quitarMiembro(
+            HttpServletRequest request,
+            @PathVariable Long equipoId,
+            @PathVariable Long usuarioId
+    ) {
+        UsuarioEntity owner = userService.obtenerOCrearDesdeRequest(request);
+
+        EquipoRapidoEntity actualizado = equipoRapidoService.quitarMiembro(owner, equipoId, usuarioId);
+        return ResponseEntity.ok(toDTO(actualizado));
+    }
+
+    @PostMapping("/{equipoId}/salir")
+    public ResponseEntity<EquipoRapidoResponseDTO> salirDeEquipo(
+            HttpServletRequest request,
+            @PathVariable Long equipoId
+    ) {
+        UsuarioEntity usuario = userService.obtenerOCrearDesdeRequest(request);
+
+        EquipoRapidoEntity actualizado = equipoRapidoService.salirDeEquipo(usuario, equipoId);
+        return ResponseEntity.ok(toDTO(actualizado));
+    }
 }

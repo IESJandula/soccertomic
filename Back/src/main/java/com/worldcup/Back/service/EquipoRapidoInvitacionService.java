@@ -4,6 +4,7 @@ import com.worldcup.Back.entity.EquipoRapidoEntity;
 import com.worldcup.Back.entity.EquipoRapidoInvitacionEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.EstadoInvitacion;
+import com.worldcup.Back.entity.enums.TipoNotificacionEquipo;
 import com.worldcup.Back.exception.BusinessException;
 import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.repository.EquipoRapidoInvitacionRepository;
@@ -30,6 +31,9 @@ public class EquipoRapidoInvitacionService {
 
     @Autowired
     private AmistadService amistadService;
+
+    @Autowired
+    private EquipoRapidoNotificacionService equipoRapidoNotificacionService;
 
     @Transactional
     public EquipoRapidoInvitacionEntity crearInvitacion(Long equipoRapidoId, Long destinatarioId, UsuarioEntity emisor) {
@@ -97,6 +101,14 @@ public class EquipoRapidoInvitacionService {
             equipo.getMiembros().add(destinatario);
             equipoRapidoRepository.save(equipo);
         }
+
+        equipoRapidoNotificacionService.crearNotificacion(
+            equipo,
+            equipo.getOwner(),
+            destinatario,
+            TipoNotificacionEquipo.ACEPTACION,
+            destinatario.getNombre() + " ha aceptado la invitacion y ahora forma parte del equipo \"" + equipo.getNombre() + "\"."
+        );
 
         invitacion.setEstado(EstadoInvitacion.ACEPTADA);
         invitacion.setRespondidaEn(LocalDateTime.now());

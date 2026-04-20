@@ -17,6 +17,7 @@ const notificationsStore = useNotificationsStore()
 
 const invitaciones = ref([])
 const invitacionesEquipo = ref([])
+const notificacionesEquipo = ref([])
 const notificacionesInfo = ref([])
 const solicitudesAmistad = ref([])
 const invitacionesAceptadas = ref([])
@@ -40,6 +41,7 @@ const cargarTodo = async () => {
       amistadService.obtenerSolicitudesPendientes(),
     ])
     invitacionesEquipo.value = await invitacionService.obtenerMisInvitacionesEquipo()
+    notificacionesEquipo.value = await invitacionService.obtenerMisNotificacionesEquipo()
     const esReserva = (inv) => inv && (inv.precioTotalPista !== null && inv.precioTotalPista !== undefined)
     invitaciones.value = todasInvitaciones.filter(i => i.estado === 'PENDIENTE')
     invitacionesAceptadas.value = todasInvitaciones.filter(i => i.estado === 'ACEPTADA' && !esReserva(i) && !i.mensaje)
@@ -99,6 +101,7 @@ const aceptarInvitacionEquipo = async (invitacionId) => {
   try {
     await invitacionService.aceptarInvitacionEquipo(invitacionId)
     uiStore.showToast({ message: 'Te uniste al equipo correctamente.', type: 'success' })
+    window.dispatchEvent(new CustomEvent('soccertomic:teams-updated'))
     await cargarTodo()
   } catch (error) {
     uiStore.showToast({ message: error.message || 'Error al aceptar invitacion de equipo.', type: 'error' })
@@ -159,6 +162,19 @@ const rechazarSolicitudAmistad = async (solicitudId) => {
   }
 }
 
+const eliminarNotificacionEquipo = async (notificacionId) => {
+  procesando.value = `noti-equipo-${notificacionId}`
+  try {
+    await invitacionService.eliminarNotificacionEquipo(notificacionId)
+    uiStore.showToast({ message: 'Notificación eliminada.', type: 'success' })
+    await cargarTodo()
+  } catch (error) {
+    uiStore.showToast({ message: error.message || 'No se pudo eliminar la notificación.', type: 'error' })
+  } finally {
+    procesando.value = null
+  }
+}
+
 const marcarReservaComoPagada = async (invitacionId) => {
   procesando.value = `reserva-${invitacionId}`
   try {
@@ -214,6 +230,45 @@ const irAPartido = (partidoId) => {
                 @click="rechazarSolicitudAmistad(solicitud.id)"
               >
                 Rechazar
+              </BaseButton>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="notificacionesEquipo.length > 0" class="card-surface p-4 md:p-5">
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Notificaciones de equipo ({{ notificacionesEquipo.length }})</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
+          <article
+            v-for="notificacion in notificacionesEquipo"
+            :key="`equipo-noti-${notificacion.id}`"
+            class="rounded-xl p-3 space-y-2 border"
+            :class="notificacion.tipo === 'EXPULSADO'
+              ? 'border-red-200 bg-red-50'
+              : 'border-emerald-200 bg-emerald-50'"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-sm font-semibold text-slate-800">{{ notificacion.equipoNombre }}</p>
+                <p
+                  class="text-xs mt-1 font-semibold"
+                  :class="notificacion.tipo === 'EXPULSADO' ? 'text-red-700' : 'text-emerald-700'"
+                >
+                  {{ notificacion.tipo }}
+                </p>
+              </div>
+            </div>
+            <p class="text-sm" :class="notificacion.tipo === 'EXPULSADO' ? 'text-red-800' : 'text-slate-700'">{{ notificacion.mensaje }}</p>
+            <p class="text-xs text-slate-500" v-if="notificacion.actor?.nombre">Por {{ notificacion.actor.nombre }}</p>
+            <p class="text-xs text-slate-500">{{ formatearFecha(notificacion.creadaEn) }}</p>
+            <div class="flex justify-end pt-1">
+              <BaseButton
+                size="sm"
+                :variant="notificacion.tipo === 'EXPULSADO' ? 'danger' : 'secondary'"
+                :loading="procesando === `noti-equipo-${notificacion.id}`"
+                @click="eliminarNotificacionEquipo(notificacion.id)"
+              >
+                OK
               </BaseButton>
             </div>
           </article>
