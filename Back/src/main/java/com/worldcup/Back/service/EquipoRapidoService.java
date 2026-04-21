@@ -6,6 +6,7 @@ import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.TipoNotificacionEquipo;
 import com.worldcup.Back.exception.BusinessException;
 import com.worldcup.Back.exception.ResourceNotFoundException;
+import com.worldcup.Back.repository.EquipoRapidoInvitacionRepository;
 import com.worldcup.Back.repository.EquipoRapidoRepository;
 import com.worldcup.Back.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +33,9 @@ public class EquipoRapidoService {
 
     @Autowired
     private EquipoRapidoNotificacionService equipoRapidoNotificacionService;
+
+    @Autowired
+    private EquipoRapidoInvitacionRepository equipoRapidoInvitacionRepository;
 
     @Transactional(readOnly = true)
     public List<EquipoRapidoEntity> listarMisEquipos(UsuarioEntity owner) {
@@ -260,6 +264,7 @@ public class EquipoRapidoService {
             "El equipo \"" + equipo.getNombre() + "\" ha sido eliminado por " + owner.getNombre() + "."
         ));
 
+        equipoRapidoInvitacionRepository.deleteByEquipoRapidoId(equipoId);
         equipoRapidoRepository.delete(equipo);
     }
 }

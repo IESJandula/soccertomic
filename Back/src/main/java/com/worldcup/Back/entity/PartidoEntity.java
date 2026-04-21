@@ -61,7 +61,7 @@ public class PartidoEntity {
     @Column
     private LocalDateTime ratingProcesadoEn;
 
-    @Column(length = 20)
+    @Column
     private String ratingSnapshotVersion;
 
     @Column(nullable = false, precision = 4, scale = 3)

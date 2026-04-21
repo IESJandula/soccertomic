@@ -11,8 +11,8 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Cargar usuario previo al montar la app
+// Reconciliar sesión real de Firebase antes del primer render protegido.
 const authStore = useAuthStore()
-authStore.loadUser()
-
-app.mount('#app')
+authStore.initializeSession().finally(() => {
+	app.mount('#app')
+})

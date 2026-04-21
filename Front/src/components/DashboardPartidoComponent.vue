@@ -43,10 +43,12 @@ const companerosAsignados = ref([])
 const mensajeVotacion = ref('')
 const mostrarModalDiscusionResultado = ref(false)
 const guardandoResultadoOficial = ref(false)
+const cerrandoActa = ref(false)
 const enviandoSolicitudA = ref(null)
 const solicitudesEnviadas = ref([])
 const amigosActuales = ref([])
 const estadoPagoReserva = ref({})
+const marcadorPropuestoSeleccionado = ref('')
 const votacionForm = ref({
   golesEquipoAPropuesto: 0,
   golesEquipoBPropuesto: 0,
@@ -606,6 +608,10 @@ const cargarPanelVotacion = async (partidoId) => {
 
 const guardarVotacion = async () => {
   if (!partido.value) return
+  if (actaCerrada.value) {
+    uiStore.showToast({ message: 'El acta está cerrada. Ya no se pueden enviar votos.', type: 'warning' })
+    return
+  }
   guardandoVotacion.value = true
   mensajeVotacion.value = ''
 
@@ -650,6 +656,35 @@ const textoVotosResumen = computed(() => {
   const sujeto = total === 1 ? 'jugador ha' : 'jugadores han'
   return `${total} ${sujeto} votado · ¡Anímate a compartir tu opinión!`
 })
+
+const actaCerrada = computed(() => Boolean(partido.value?.archivado))
+
+const marcadoresPropuestos = computed(() => {
+  const lista = Array.isArray(resumenVotacion.value?.marcadoresPropuestos)
+    ? resumenVotacion.value.marcadoresPropuestos
+    : []
+
+  return lista
+    .filter((item) => Number.isInteger(Number(item?.golesEquipoA)) && Number.isInteger(Number(item?.golesEquipoB)))
+    .map((item) => ({
+      golesEquipoA: Number(item.golesEquipoA),
+      golesEquipoB: Number(item.golesEquipoB),
+      votos: Number(item.votos || 0),
+      value: `${item.golesEquipoA}:${item.golesEquipoB}`,
+      label: `${item.golesEquipoA}-${item.golesEquipoB} (${item.votos || 0} votos)`,
+    }))
+})
+
+const aplicarMarcadorPropuesto = () => {
+  const selected = String(marcadorPropuestoSeleccionado.value || '').trim()
+  if (!selected) return
+
+  const [golesA, golesB] = selected.split(':').map((raw) => Number(raw))
+  if (!Number.isInteger(golesA) || !Number.isInteger(golesB)) return
+
+  resultadoOficialForm.value.golesEquipoA = golesA
+  resultadoOficialForm.value.golesEquipoB = golesB
+}
 
 const marcadorPromedio = computed(() => {
   if (Number.isFinite(Number(partido.value?.golesEquipoA)) && Number.isFinite(Number(partido.value?.golesEquipoB))) {
@@ -727,7 +762,7 @@ const resultadoBanner = computed(() => {
 })
 
 const guardarResultadoOficial = async () => {
-  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO') return
+  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO' || actaCerrada.value) return
 
   const golesA = Number(resultadoOficialForm.value.golesEquipoA)
   const golesB = Number(resultadoOficialForm.value.golesEquipoB)
@@ -746,6 +781,35 @@ const guardarResultadoOficial = async () => {
     uiStore.showToast({ message: err?.message || 'No se pudo actualizar el resultado oficial', type: 'error' })
   } finally {
     guardandoResultadoOficial.value = false
+  }
+}
+
+const cerrarActaPartido = async () => {
+  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO' || actaCerrada.value) return
+
+  const accepted = await uiStore.askConfirm({
+    title: 'Cerrar acta del partido',
+    message: 'Esta acción procesa el rating y bloquea toda interacción posterior. ¿Deseas continuar?',
+    confirmLabel: 'CERRAR ACTA',
+    cancelLabel: 'Cancelar',
+    variant: 'danger',
+  })
+
+  if (!accepted) return
+
+  cerrandoActa.value = true
+  try {
+    const response = await partidoService.cerrarActaPartido(partido.value.id)
+    resultadoProcesoRating.value = response
+    mensajeProcesoRating.value = response?.mensaje || 'Acta cerrada correctamente.'
+    uiStore.showToast({ message: mensajeProcesoRating.value, type: 'success' })
+    await recargarPartido()
+    await cargarPanelVotacion(partido.value.id)
+  } catch (err) {
+    const message = err?.message || 'No se pudo cerrar el acta del partido'
+    uiStore.showToast({ message, type: 'error' })
+  } finally {
+    cerrandoActa.value = false
   }
 }
 
@@ -1394,7 +1458,6 @@ const cerrarModalDiscusionResultado = () => {
             </div>
           </div>
 
-          <p class="text-xs text-slate-500">Tu resultado se suma a la media compartida desde el popup.</p>
         </div>
 
       </section>

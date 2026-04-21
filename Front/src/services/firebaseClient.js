@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
+  onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -51,6 +52,43 @@ const getFirebaseAuth = async () => {
     persistenceConfigured = true
   }
   return auth
+}
+
+const waitForAuthState = (auth, timeoutMs) => {
+  return new Promise((resolve) => {
+    let settled = false
+
+    const timeoutId = setTimeout(() => {
+      if (settled) return
+      settled = true
+      resolve(auth.currentUser)
+    }, timeoutMs)
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutId)
+      unsubscribe()
+      resolve(firebaseUser)
+    })
+  })
+}
+
+export const getActiveFirebaseSession = async ({ forceRefresh = true, timeoutMs = 4000 } = {}) => {
+  const auth = await getFirebaseAuth()
+  const firebaseUser = auth.currentUser || await waitForAuthState(auth, timeoutMs)
+
+  if (!firebaseUser) {
+    return null
+  }
+
+  const idToken = await firebaseUser.getIdToken(forceRefresh)
+
+  return {
+    idToken,
+    email: firebaseUser.email || '',
+    displayName: firebaseUser.displayName || '',
+  }
 }
 
 export const loginWithGooglePopup = async () => {

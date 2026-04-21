@@ -35,6 +35,7 @@ public class PartidoDetalleDTO {
     private Integer golesEquipoA;
     private Integer golesEquipoB;
     private String ganador;
+    private Boolean archivado;
     private Boolean ratingProcesado;
     private String estadoCalidad;
     private BigDecimal scoreCalidad;

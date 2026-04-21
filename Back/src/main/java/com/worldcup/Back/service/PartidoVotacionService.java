@@ -97,6 +97,10 @@ public class PartidoVotacionService {
         autoFinalizarSiCorresponde(partido);
         validarPermisosYEstado(partido, votante);
 
+        if (Boolean.TRUE.equals(partido.getArchivado())) {
+            throw new RuntimeException("El acta está cerrada y ya no admite más votaciones");
+        }
+
         PartidoVotacionEntity entity = partidoVotacionRepository.findByPartidoAndVotante(partido, votante)
                 .orElseGet(PartidoVotacionEntity::new);
 
@@ -165,21 +169,40 @@ public class PartidoVotacionService {
 
         List<PartidoVotacionEntity> votos = partidoVotacionRepository.findByPartido(partido);
         if (votos.isEmpty()) {
-            return new PartidoVotacionPanelCompartidoDTO(partidoId, 0, 0.0, 0.0, 0.0, null, List.of(), List.of());
+            return new PartidoVotacionPanelCompartidoDTO(partidoId, 0, 0.0, 0.0, 0.0, null, List.of(), List.of(), List.of());
         }
 
         double promedioA = votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoAPropuesto).average().orElse(0);
         double promedioB = votos.stream().mapToInt(PartidoVotacionEntity::getGolesEquipoBPropuesto).average().orElse(0);
         double porcentajeParejo = votos.stream().filter(v -> Boolean.TRUE.equals(v.getPartidoFueParejo())).count() * 100.0 / votos.size();
 
-        Map<String, Long> intensidadConteo = votos.stream()
-            .map(PartidoVotacionEntity::getIntensidadPartido)
-            .filter(Objects::nonNull)
-            .collect(Collectors.groupingBy(i -> i, Collectors.counting()));
-        String intensidadMasVotada = intensidadConteo.entrySet().stream()
-            .max(Map.Entry.comparingByValue())
-            .map(Map.Entry::getKey)
-            .orElse(null);
+        List<String> intensidades = votos.stream()
+                .map(PartidoVotacionEntity::getIntensidadPartido)
+                .filter(Objects::nonNull)
+                .toList();
+        double intensidadPromedio = intensidades.stream()
+                .mapToInt(this::intensidadOrdinal)
+                .average()
+                .orElse(0.0);
+        String intensidadMasVotada = intensidadDesdePromedio(intensidadPromedio);
+
+        Map<String, Integer> marcadorConteo = new LinkedHashMap<>();
+        for (PartidoVotacionEntity voto : votos) {
+            String key = voto.getGolesEquipoAPropuesto() + ":" + voto.getGolesEquipoBPropuesto();
+            marcadorConteo.merge(key, 1, Integer::sum);
+        }
+
+        List<PartidoVotacionPanelCompartidoDTO.MarcadorPropuestoDTO> marcadoresPropuestos = marcadorConteo.entrySet().stream()
+                .map(entry -> {
+                    String[] parts = entry.getKey().split(":");
+                    return new PartidoVotacionPanelCompartidoDTO.MarcadorPropuestoDTO(
+                            Integer.parseInt(parts[0]),
+                            Integer.parseInt(parts[1]),
+                            entry.getValue()
+                    );
+                })
+                .sorted(Comparator.comparingInt(PartidoVotacionPanelCompartidoDTO.MarcadorPropuestoDTO::getVotos).reversed())
+                .toList();
 
         Map<Long, Integer> conteoDiferenciales = new HashMap<>();
         for (PartidoVotacionEntity voto : votos) {
@@ -238,6 +261,7 @@ public class PartidoVotacionService {
                 promedioB,
                 porcentajeParejo,
                 intensidadMasVotada,
+                marcadoresPropuestos,
                 diferenciales,
                 promedioCompaneros
         );
@@ -256,6 +280,29 @@ public class PartidoVotacionService {
         if (partido.getEstado() != EstadoPartido.FINALIZADO) {
             throw new RuntimeException("Las votaciones se habilitan cuando el partido finaliza");
         }
+
+    }
+
+    private int intensidadOrdinal(String intensidad) {
+        if (intensidad == null) return 0;
+        return switch (intensidad) {
+            case "BAJO" -> 1;
+            case "MEDIO" -> 2;
+            case "ALTO" -> 3;
+            case "MUY_ALTO" -> 4;
+            default -> 0;
+        };
+    }
+
+    private String intensidadDesdePromedio(double promedio) {
+        if (promedio <= 0.0) return null;
+        int rounded = (int) Math.round(promedio);
+        return switch (rounded) {
+            case 1 -> "BAJO";
+            case 2 -> "MEDIO";
+            case 3 -> "ALTO";
+            default -> "MUY_ALTO";
+        };
     }
 
     private void validarVotacion(PartidoEntity partido,

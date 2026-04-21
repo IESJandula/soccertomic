@@ -136,6 +136,7 @@ public class PartidoController {
                 partido.getGolesEquipoA(),
                 partido.getGolesEquipoB(),
                 partido.getGanador(),
+                partido.getArchivado(),
                 partido.getRatingProcesado(),
                 partido.getEstadoCalidad(),
                 partido.getScoreCalidad(),
@@ -556,6 +557,23 @@ public class PartidoController {
 
         try {
             PartidoRatingProcesoResponseDTO response = partidoService.procesarRatingPartido(id, solicitante);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/acta/cerrar")
+    public ResponseEntity<?> cerrarActaPartido(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
+        try {
+            PartidoRatingProcesoResponseDTO response = partidoService.cerrarActaPartido(id, solicitante);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

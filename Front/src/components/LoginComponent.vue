@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { loginWithEmailPassword, loginWithGooglePopup, registerWithEmailPassword } from '../services/firebaseClient'
@@ -9,6 +9,7 @@ import AppIcon from './ui/AppIcon.vue'
 import futbolinLogo from '../assets/FutbolIn_Icono.png'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 
@@ -34,6 +35,19 @@ const popupNoticeVisible = ref(false)
 let popupReminderTimeoutId = null
 
 const subtitulo = computed(() => '')
+
+const resolvePostLoginRoute = (profileCompleted) => {
+  if (!profileCompleted) {
+    return '/registro/perfil'
+  }
+
+  const requestedRedirect = String(route.query?.redirect || '').trim()
+  if (!requestedRedirect || !requestedRedirect.startsWith('/') || requestedRedirect.startsWith('//') || requestedRedirect.startsWith('/login')) {
+    return '/dashboard/partidos'
+  }
+
+  return requestedRedirect
+}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -200,7 +214,7 @@ const handleAuth = async () => {
 
     uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success', duration: 5000 })
 
-    router.push(result.profileCompleted ? '/dashboard/partidos' : '/registro/perfil')
+    router.push(resolvePostLoginRoute(result.profileCompleted))
   } catch (error) {
     const feedback = parseFirebaseAuthError(error)
     uiStore.showToast({ message: feedback.message, type: feedback.type })
@@ -235,7 +249,7 @@ const handleEmailPasswordAuth = async () => {
     }
 
     uiStore.showToast({ message: 'Sesión iniciada', type: 'login-success', duration: 5000 })
-    router.push(result.profileCompleted ? '/dashboard/partidos' : '/registro/perfil')
+    router.push(resolvePostLoginRoute(result.profileCompleted))
   } catch (error) {
     const feedback = parseFirebaseAuthError(error)
     loginError.value = feedback.message
@@ -274,7 +288,7 @@ const handleRegisterEmailPassword = async () => {
     }
 
     uiStore.showToast({ message: 'Cuenta creada correctamente', type: 'login-success' })
-    router.push('/registro/perfil')
+    router.push(resolvePostLoginRoute(false))
   } catch (error) {
     const feedback = parseFirebaseAuthError(error)
     registerError.value = feedback.message
@@ -290,6 +304,22 @@ const switchAuthMode = (mode) => {
   loginError.value = ''
   registerError.value = ''
 }
+
+onMounted(() => {
+  if (String(route.query?.reason || '').trim() !== 'expired') {
+    return
+  }
+
+  uiStore.showToast({
+    message: 'Tu sesión ha caducado. Inicia sesión de nuevo para continuar.',
+    type: 'warning',
+    duration: 5000,
+  })
+
+  const redirect = String(route.query?.redirect || '').trim()
+  const nextQuery = redirect ? { redirect } : {}
+  router.replace({ path: '/login', query: nextQuery })
+})
 </script>
 
 <template>

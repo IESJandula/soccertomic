@@ -186,8 +186,8 @@ const mostrarAmbosResultados = (partido) => {
 const resultadoBaseLabel = (partido) => {
   const golesA = partido?.golesBaseEquipoA
   const golesB = partido?.golesBaseEquipoB
-  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Base: -'
-  return `Base: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
+  if (!Number.isFinite(Number(golesA)) || !Number.isFinite(Number(golesB))) return 'Resultado: -'
+  return `Resultado: ${marcadorEntero(golesA)} - ${marcadorEntero(golesB)}`
 }
 
 const resultadoConsensuadoLabel = (partido) => {
@@ -596,8 +596,8 @@ const nivelSocialExperiencia = computed(() => {
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                   <div v-if="mostrarAmbosResultados(partido)" class="text-right leading-tight">
-                    <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoBaseLabel(partido) }}</p>
-                    <p class="text-[11px] md:text-xs font-semibold opacity-95">{{ resultadoConsensuadoLabel(partido) }}</p>
+                    <p class="text-[20px] md:text-xs font-semibold opacity-95">{{ resultadoBaseLabel(partido) }}</p>
+                    
                   </div>
                   <p v-else class="text-lg md:text-xl font-extrabold leading-none">{{ marcadorEntero(partido.golesEquipoA) }} - {{ marcadorEntero(partido.golesEquipoB) }}</p>
                   <span class="px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-semibold bg-slate-300 text-slate-900 border border-slate-400">{{ formatearResultado(partido.resultadoParaUsuario) }}</span>

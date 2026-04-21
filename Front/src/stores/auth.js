@@ -2,13 +2,20 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiService from '../services/apiService'
 import { clearIdentity, getAuthToken, setAuthToken } from '../services/authIdentity'
-import { logoutFirebaseSession } from '../services/firebaseClient'
+import { getActiveFirebaseSession, logoutFirebaseSession } from '../services/firebaseClient'
 import { formatDateTimeEs } from '../utils/dateFormat'
+
+let unauthorizedHandlerBound = false
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const hasPlayerProfile = ref(null)
-  const isAuthenticated = computed(() => user.value !== null && Boolean(getAuthToken()))
+  const authStatus = ref('bootstrapping')
+  const isAuthenticated = computed(() => authStatus.value === 'authenticated' && user.value !== null && Boolean(getAuthToken()))
+  const isBootstrapping = computed(() => authStatus.value === 'bootstrapping')
+
+  let bootstrapPromise = null
+  let expiringSession = false
 
   const hydrateSessionUser = (resumen, email) => ({
     id: resumen?.id || null,
@@ -36,10 +43,6 @@ export const useAuthStore = defineStore('auth', () => {
       user.value.rasgos = resumen?.rasgos || []
       sessionStorage.setItem('user', JSON.stringify(user.value))
     } catch (error) {
-      if (error?.status === 401) {
-        logout()
-        return
-      }
       // Non-blocking - user context remains valid even if backend sync fails
       console.warn('Could not refresh user from backend:', error?.message)
     }
@@ -56,10 +59,6 @@ export const useAuthStore = defineStore('auth', () => {
       hasPlayerProfile.value = true
       return true
     } catch (error) {
-      if (error?.status === 401) {
-        logout()
-        return false
-      }
       if (error?.status === 404) {
         hasPlayerProfile.value = false
         return false
@@ -71,20 +70,54 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const loadUser = () => {
-    if (!getAuthToken()) {
-      clearIdentity()
-      user.value = null
-      hasPlayerProfile.value = null
-      return
+  const resetIdentity = () => {
+    user.value = null
+    hasPlayerProfile.value = null
+    sessionStorage.removeItem('user')
+    clearIdentity()
+  }
+
+  const initializeSession = async () => {
+    if (bootstrapPromise) {
+      return bootstrapPromise
     }
 
-    const storedUser = sessionStorage.getItem('user')
-    if (storedUser) {
-      user.value = JSON.parse(storedUser)
-      refreshUsuario()
-      checkPlayerProfileCompleted()
-    }
+    bootstrapPromise = (async () => {
+      authStatus.value = 'bootstrapping'
+
+      try {
+        const firebaseSession = await getActiveFirebaseSession({ forceRefresh: true, timeoutMs: 4000 })
+
+        if (!firebaseSession?.idToken || !firebaseSession?.email) {
+          resetIdentity()
+          authStatus.value = 'anonymous'
+          return { authenticated: false }
+        }
+
+        setAuthToken(firebaseSession.idToken)
+
+        const resumen = await apiService.getUsuarioResumen(null)
+        const newUser = hydrateSessionUser(resumen, firebaseSession.email)
+        user.value = newUser
+        sessionStorage.setItem('user', JSON.stringify(newUser))
+        authStatus.value = 'authenticated'
+
+        await checkPlayerProfileCompleted()
+        return { authenticated: true }
+      } catch (error) {
+        resetIdentity()
+        authStatus.value = 'anonymous'
+        return { authenticated: false, error }
+      } finally {
+        bootstrapPromise = null
+      }
+    })()
+
+    return bootstrapPromise
+  }
+
+  const loadUser = () => {
+    void initializeSession()
   }
 
   const loginWithFirebaseToken = async ({ idToken, email, displayName }, isRegistration = false) => {
@@ -102,12 +135,12 @@ export const useAuthStore = defineStore('auth', () => {
       const newUser = hydrateSessionUser(response, email)
       user.value = newUser
       sessionStorage.setItem('user', JSON.stringify(newUser))
+      authStatus.value = 'authenticated'
       const profileCompleted = await checkPlayerProfileCompleted()
       return { success: true, message: 'Sesión iniciada', profileCompleted }
     } catch (error) {
-      clearIdentity()
-      user.value = null
-      hasPlayerProfile.value = null
+      resetIdentity()
+      authStatus.value = 'anonymous'
       return {
         success: false,
         message: error?.message || 'No se pudo completar el inicio de sesión con Firebase',
@@ -115,17 +148,39 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const logout = async () => {
-    try {
-      await logoutFirebaseSession()
-    } catch (error) {
-      console.warn('No se pudo cerrar sesión en Firebase:', error?.message)
+  const logout = async ({ signOutFirebase = true } = {}) => {
+    if (signOutFirebase) {
+      try {
+        await logoutFirebaseSession()
+      } catch (error) {
+        console.warn('No se pudo cerrar sesión en Firebase:', error?.message)
+      }
     }
 
-    user.value = null
-    hasPlayerProfile.value = null
-    sessionStorage.removeItem('user')
-    clearIdentity()
+    resetIdentity()
+    authStatus.value = 'anonymous'
+  }
+
+  const expireSession = async () => {
+    if (expiringSession) {
+      return
+    }
+
+    expiringSession = true
+
+    try {
+      await logout({ signOutFirebase: true })
+
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        const redirectTarget = `${window.location.pathname}${window.location.search}`
+        const redirectQuery = redirectTarget && redirectTarget !== '/login'
+          ? `&redirect=${encodeURIComponent(redirectTarget)}`
+          : ''
+        window.location.assign(`/login?reason=expired${redirectQuery}`)
+      }
+    } finally {
+      expiringSession = false
+    }
   }
 
   const updateRasgos = async (rasgos) => {
@@ -148,15 +203,26 @@ export const useAuthStore = defineStore('auth', () => {
     hasPlayerProfile.value = true
   }
 
+  if (!unauthorizedHandlerBound) {
+    apiService.setUnauthorizedHandler(async () => {
+      await expireSession()
+    })
+    unauthorizedHandlerBound = true
+  }
+
   return {
     user,
     hasPlayerProfile,
+    authStatus,
+    isBootstrapping,
     isAuthenticated,
     loginWithFirebaseToken,
     logout,
+    expireSession,
     updateRasgos,
     refreshUsuario,
     loadUser,
+    initializeSession,
     checkPlayerProfileCompleted,
     markPlayerProfileCompleted,
   }

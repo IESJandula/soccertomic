@@ -844,6 +844,32 @@ public class PartidoService {
     }
 
     @Transactional
+    public PartidoRatingProcesoResponseDTO cerrarActaPartido(Long partidoId, UsuarioEntity solicitante) {
+        PartidoEntity partido = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede cerrar el acta del partido");
+
+        if (partido.getEstado() == null || !partido.getEstado().isFinalizado()) {
+            throw new IllegalArgumentException("El acta solo puede cerrarse cuando el partido está finalizado");
+        }
+
+        PartidoRatingProcesoResponseDTO proceso = procesarRatingPartido(partidoId, solicitante);
+
+        PartidoEntity actualizado = partidoRepository.findById(partidoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
+
+        if (!Boolean.TRUE.equals(actualizado.getArchivado())) {
+            actualizado.setArchivado(true);
+            actualizado.setActualizadoEn(LocalDateTime.now());
+            partidoRepository.save(actualizado);
+        }
+
+        proceso.setMensaje("Acta cerrada correctamente. No se permiten más cambios en este partido.");
+        return proceso;
+    }
+
+    @Transactional
     public PartidoEntity actualizarResultadoOficial(Long partidoId, UsuarioEntity solicitante, Integer golesEquipoA, Integer golesEquipoB) {
         PartidoEntity partido = partidoRepository.findById(partidoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
@@ -852,6 +878,10 @@ public class PartidoService {
 
         if (partido.getEstado() == null || !partido.getEstado().isFinalizado()) {
             throw new IllegalArgumentException("El resultado oficial solo puede fijarse cuando el partido está finalizado");
+        }
+
+        if (Boolean.TRUE.equals(partido.getArchivado())) {
+            throw new IllegalArgumentException("El acta está cerrada. Ya no se puede cambiar el resultado oficial");
         }
 
         if (golesEquipoA == null || golesEquipoB == null) {
@@ -894,6 +924,10 @@ public class PartidoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
 
         validarPermisoOrganizador(partido, solicitante, "Solo una persona organizadora puede registrar incidencias");
+
+        if (Boolean.TRUE.equals(partido.getArchivado())) {
+            throw new IllegalArgumentException("El acta está cerrada. Ya no se pueden registrar incidencias");
+        }
 
         Long usuarioAfectadoId = dto.getUsuarioId() != null ? dto.getUsuarioId() : solicitante.getId();
         UsuarioEntity usuarioAfectado = usuarioRepository.findById(usuarioAfectadoId)

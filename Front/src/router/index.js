@@ -79,13 +79,31 @@ const router = createRouter({
   routes
 })
 
+const sanitizeRedirectTarget = (candidate) => {
+  const normalized = String(candidate || '').trim()
+  if (!normalized || !normalized.startsWith('/')) {
+    return null
+  }
+  if (normalized.startsWith('//') || normalized.startsWith('/login')) {
+    return null
+  }
+  return normalized
+}
+
 // Guard de navegación
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth
 
+  if (authStore.isBootstrapping) {
+    await authStore.initializeSession()
+  }
+
   if (requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    return next({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
   }
 
   if (!authStore.isAuthenticated) {
@@ -97,6 +115,10 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.path === '/login') {
+    const requestedRedirect = sanitizeRedirectTarget(to.query?.redirect)
+    if (requestedRedirect && authStore.hasPlayerProfile) {
+      return next(requestedRedirect)
+    }
     return next(authStore.hasPlayerProfile ? '/dashboard/partidos' : '/registro/perfil')
   }
 

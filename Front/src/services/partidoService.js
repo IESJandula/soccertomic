@@ -185,6 +185,13 @@ class PartidoService {
       body: JSON.stringify({ golesEquipoA, golesEquipoB }),
     })
   }
+
+  async cerrarActaPartido(partidoId) {
+    return apiService.request(ENDPOINTS.PARTIDOS_CERRAR_ACTA(partidoId), {
+      method: 'POST',
+      useCache: false,
+    })
+  }
 }
 
 export default new PartidoService()

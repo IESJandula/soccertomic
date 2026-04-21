@@ -4,6 +4,7 @@ import com.worldcup.Back.entity.EquipoRapidoEntity;
 import com.worldcup.Back.entity.EquipoRapidoInvitacionEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.entity.enums.EstadoInvitacion;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +25,8 @@ public interface EquipoRapidoInvitacionRepository extends JpaRepository<EquipoRa
     Optional<EquipoRapidoInvitacionEntity> findByIdAndDestinatario(@Param("id") Long id, @Param("destinatario") UsuarioEntity destinatario);
 
     boolean existsByEquipoRapidoAndDestinatarioAndEstado(EquipoRapidoEntity equipoRapido, UsuarioEntity destinatario, EstadoInvitacion estado);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM EquipoRapidoInvitacionEntity i WHERE i.equipoRapido.id = :equipoRapidoId")
+    int deleteByEquipoRapidoId(@Param("equipoRapidoId") Long equipoRapidoId);
 }

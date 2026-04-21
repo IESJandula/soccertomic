@@ -30,6 +30,7 @@ export const ENDPOINTS = {
   PARTIDOS_FUTUROS: `${CORE_API_BASE_URL}/api/partidos/futuros`,
   PARTIDOS_BALANCEAR: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/balancear-equipos`,
   PARTIDOS_RESULTADO_OFICIAL: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/resultado-oficial`,
+  PARTIDOS_CERRAR_ACTA: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/acta/cerrar`,
   PARTIDOS_VOTACION_ME: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/me`,
   PARTIDOS_VOTACION_ASIGNACION: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/asignacion`,
   PARTIDOS_VOTACION_PANEL_COMPARTIDO: (partidoId) => `${CORE_API_BASE_URL}/api/partidos/${partidoId}/votaciones/panel-compartido`,

@@ -18,8 +18,19 @@ public class PartidoVotacionPanelCompartidoDTO {
     private Double promedioGolesEquipoB;
     private Double porcentajePartidoParejo;
     private String intensidadMasVotada;
+    private List<MarcadorPropuestoDTO> marcadoresPropuestos;
     private List<JugadorConteoDTO> jugadoresDiferenciales;
     private List<JugadorPromedioDTO> valoracionCompaneros;
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class MarcadorPropuestoDTO {
+        private Integer golesEquipoA;
+        private Integer golesEquipoB;
+        private Integer votos;
+    }
 
     @Getter
     @Setter

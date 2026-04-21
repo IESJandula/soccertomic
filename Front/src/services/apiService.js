@@ -13,6 +13,27 @@ class APIService {
     this.DEFAULT_CACHE_TTL_MS = 60_000
     this.CACHE_PREFIX = 'apiCache:'
     this.REQUEST_TIMEOUT = REQUEST_TIMEOUT
+    this.unauthorizedHandler = null
+    this.handlingUnauthorized = false
+  }
+
+  setUnauthorizedHandler(handler) {
+    this.unauthorizedHandler = typeof handler === 'function' ? handler : null
+  }
+
+  async handleUnauthorized(errorPayload) {
+    if (!this.unauthorizedHandler || this.handlingUnauthorized) {
+      return
+    }
+
+    this.handlingUnauthorized = true
+    try {
+      await this.unauthorizedHandler(errorPayload)
+    } catch (error) {
+      console.warn('Unauthorized handler failed:', error?.message)
+    } finally {
+      this.handlingUnauthorized = false
+    }
   }
 
   isExpectedNotFound(url, status) {
@@ -126,6 +147,14 @@ class APIService {
             } catch (e) {
               errorData = { message: errorText }
             }
+          }
+
+          if (response.status === 401) {
+            await this.handleUnauthorized({
+              status: 401,
+              url,
+              data: errorData,
+            })
           }
           
           const error = new Error(

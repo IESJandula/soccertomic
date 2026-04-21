@@ -238,6 +238,29 @@ const getOtroUsuario = (amistad) => {
   return amistad.usuarioA.id === authStore.user?.id ? amistad.usuarioB : amistad.usuarioA
 }
 
+const miembrosTextoEquipo = (equipo) => {
+  const currentUserId = String(authStore.user?.id ?? '')
+  const candidatos = [
+    equipo?.owner,
+    ...(equipo?.miembros || []),
+  ].filter(Boolean)
+
+  const vistos = new Set()
+  const nombres = candidatos
+    .filter((miembro) => {
+      const miembroId = String(miembro?.id ?? '')
+      if (!miembroId || miembroId === currentUserId || vistos.has(miembroId)) {
+        return false
+      }
+      vistos.add(miembroId)
+      return true
+    })
+    .map((miembro) => String(miembro?.nombre || '').trim())
+    .filter(Boolean)
+
+  return nombres.join(', ')
+}
+
 const buscarAmigos = async () => {
   if (!buscandoAmigos.value.trim()) {
     usuariosDisponibles.value = []
@@ -722,8 +745,8 @@ const eliminarEquipoRapido = async (equipo) => {
                 <p class="font-semibold text-slate-700 mb-1">Miembros</p>
                 <p>
                   Tú
-                  <template v-if="equipo.miembros?.length">,
-                    {{ equipo.miembros.map(m => m.nombre).join(', ') }}
+                  <template v-if="miembrosTextoEquipo(equipo)">,
+                    {{ miembrosTextoEquipo(equipo) }}
                   </template>
                 </p>
               </div>
