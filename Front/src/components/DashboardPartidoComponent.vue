@@ -1383,27 +1383,19 @@ const cerrarModalDiscusionResultado = () => {
               Acta cerrada: cambios y votaciones bloqueados.
             </div>
 
-            <div :class="['w-full rounded-xl px-3 py-2.5 grid grid-cols-2 gap-2 items-center', resultadoBanner.clase]">
-              <div class="min-w-0">
-                <p class="text-lg md:text-xl font-extrabold leading-none">{{ resultadoBanner.titulo }}</p>
-                <p class="text-[11px] md:text-xs opacity-95 mt-0.5 truncate">
-                  {{ Number.isFinite(Number(partido?.golesEquipoA)) && Number.isFinite(Number(partido?.golesEquipoB)) ? 'Resultado oficial' : 'Panel compartido' }}
-                </p>
+            <div class="grid grid-cols-3 gap-1.5">
+              <div :class="['rounded-xl px-3 py-2.5 border border-transparent min-w-0', resultadoBanner.clase]">
+                <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Resultado</p>
+                <p class="text-base md:text-lg font-extrabold leading-tight mt-0.5 truncate">{{ resultadoBanner.titulo }}</p>
+                <p class="text-xl md:text-2xl font-black leading-none mt-1">{{ marcadorPromedio.golesA.toFixed(0) }} - {{ marcadorPromedio.golesB.toFixed(0) }}</p>
               </div>
-              <div class="text-right">
-                <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Marcador</p>
-                <p class="text-2xl md:text-3xl font-black leading-none">{{ marcadorPromedio.golesA.toFixed(0) }} - {{ marcadorPromedio.golesB.toFixed(0) }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-1.5">
-              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+              <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-200 min-w-0 flex flex-col">
                 <p class="text-[11px] text-slate-600">Intensidad</p>
-                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ formatIntensidad(resumenVotacion.intensidadMasVotada) }}</p>
+                <p class="text-lg md:text-2xl font-extrabold text-slate-900 leading-none flex-1 flex items-center">{{ formatIntensidad(resumenVotacion.intensidadMasVotada) }}</p>
               </div>
-              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+              <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-200 min-w-0 flex flex-col">
                 <p class="text-[11px] text-slate-600">Balanceo</p>
-                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ Number(resumenVotacion.porcentajePartidoParejo || 0).toFixed(0) }}%</p>
+                <p class="text-lg md:text-2xl font-extrabold text-slate-900 leading-none flex-1 flex items-center">{{ Number(resumenVotacion.porcentajePartidoParejo || 0).toFixed(0) }}%</p>
               </div>
             </div>
 
@@ -1434,27 +1426,19 @@ const cerrarModalDiscusionResultado = () => {
               </BaseButton>
             </div>
 
-            <div :class="['w-full rounded-xl px-3 py-2.5 grid grid-cols-2 gap-2 items-center', resultadoBanner.clase]">
-              <div class="min-w-0">
-                <p class="text-lg md:text-xl font-extrabold leading-none">{{ resultadoBanner.titulo }}</p>
-                <p class="text-[11px] md:text-xs opacity-95 mt-0.5 truncate">
-                  {{ Number.isFinite(Number(partido?.golesEquipoA)) && Number.isFinite(Number(partido?.golesEquipoB)) ? 'Resultado oficial' : 'Panel compartido' }}
-                </p>
+            <div class="grid grid-cols-3 gap-1.5">
+              <div :class="['rounded-xl px-3 py-2.5 border border-transparent min-w-0', resultadoBanner.clase]">
+                <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Resultado</p>
+                <p class="text-base md:text-lg font-extrabold leading-tight mt-0.5 truncate">{{ resultadoBanner.titulo }}</p>
+                <p class="text-xl md:text-2xl font-black leading-none mt-1">{{ marcadorPromedio.golesA.toFixed(0) }} - {{ marcadorPromedio.golesB.toFixed(0) }}</p>
               </div>
-              <div class="text-right">
-                <p class="text-[10px] md:text-[11px] uppercase tracking-wide opacity-90">Marcador</p>
-                <p class="text-2xl md:text-3xl font-black leading-none">{{ marcadorPromedio.golesA.toFixed(0) }} - {{ marcadorPromedio.golesB.toFixed(0) }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-1.5">
-              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+              <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-200 min-w-0 flex flex-col">
                 <p class="text-[11px] text-slate-600">Intensidad</p>
-                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ formatIntensidad(resumenVotacion.intensidadMasVotada) }}</p>
+                <p class="text-lg md:text-2xl font-extrabold text-slate-900 leading-none flex-1 flex items-center">{{ formatIntensidad(resumenVotacion.intensidadMasVotada) }}</p>
               </div>
-              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+              <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-200 min-w-0 flex flex-col">
                 <p class="text-[11px] text-slate-600">Balanceo</p>
-                <p class="text-sm md:text-base font-bold text-slate-900 leading-tight">{{ Number(resumenVotacion.porcentajePartidoParejo || 0).toFixed(0) }}%</p>
+                <p class="text-lg md:text-2xl font-extrabold text-slate-900 leading-none flex-1 flex items-center">{{ Number(resumenVotacion.porcentajePartidoParejo || 0).toFixed(0) }}%</p>
               </div>
             </div>
 
