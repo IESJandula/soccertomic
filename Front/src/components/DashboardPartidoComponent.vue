@@ -621,9 +621,12 @@ const guardarVotacion = async () => {
       golesEquipoBPropuesto: Number(votacionForm.value.golesEquipoBPropuesto),
       intensidadPartido: votacionForm.value.intensidadPartido,
       partidoFueParejo: Boolean(votacionForm.value.partidoFueParejo),
-      partidoAlterado: Boolean(votacionForm.value.partidoAlterado),
       jugadoresDiferenciales: (votacionForm.value.jugadoresDiferenciales || []).filter((id) => !esUsuarioActual(id)),
       valoracionesCompaneros: votacionForm.value.valoracionesCompaneros,
+    }
+
+    if (esOrganizador()) {
+      payload.partidoAlterado = Boolean(votacionForm.value.partidoAlterado)
     }
 
     miVoto.value = await partidoVotacionService.guardarMiVoto(partido.value.id, payload)
@@ -1087,6 +1090,20 @@ const cerrarModalDiscusionResultado = () => {
                 <input v-model.number="resultadoOficialForm.golesEquipoB" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
               </label>
             </div>
+            <div v-if="marcadoresPropuestos.length" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-end">
+              <label class="block">
+                <span class="block text-xs text-slate-600 mb-1">Marcadores propuestos por participantes</span>
+                <select v-model="marcadorPropuestoSeleccionado" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                  <option value="">Selecciona un marcador</option>
+                  <option v-for="marcador in marcadoresPropuestos" :key="marcador.value" :value="marcador.value">
+                    {{ marcador.label }}
+                  </option>
+                </select>
+              </label>
+              <BaseButton size="sm" variant="secondary" :disabled="!marcadorPropuestoSeleccionado" @click="aplicarMarcadorPropuesto">
+                Usar marcador
+              </BaseButton>
+            </div>
             <div class="flex justify-end">
               <BaseButton size="sm" :loading="guardandoResultadoOficial" :disabled="guardandoResultadoOficial" @click="guardarResultadoOficial">
                 Guardar resultado oficial
@@ -1171,10 +1188,6 @@ const cerrarModalDiscusionResultado = () => {
             <article class="rounded-lg border-2 p-3 space-y-2" :style="teamAColor.cardStyle">
               <div class="flex items-center justify-between gap-2">
                 <h4 class="font-bold" :style="teamAColor.titleStyle">Equipo {{ partido.colorEquipoA || 'A' }}</h4>
-                <div class="flex items-center gap-1 text-xs" :style="teamAColor.subtitleStyle">
-                  <span>Resultado</span>
-                  <input v-model.number="votacionForm.golesEquipoAPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-slate-900" />
-                </div>
               </div>
               <div v-if="!partido.equipoA || partido.equipoA.length === 0" class="text-xs" :style="teamAColor.subtitleStyle">Sin jugadores</div>
               <div v-else class="space-y-1.5">
@@ -1257,10 +1270,6 @@ const cerrarModalDiscusionResultado = () => {
             <article class="rounded-lg border-2 p-3 space-y-2" :style="teamBColor.cardStyle">
               <div class="flex items-center justify-between gap-2">
                 <h4 class="font-bold" :style="teamBColor.titleStyle">Equipo {{ partido.colorEquipoB || 'B' }}</h4>
-                <div class="flex items-center gap-1 text-xs" :style="teamBColor.subtitleStyle">
-                  <span>Resultado</span>
-                  <input v-model.number="votacionForm.golesEquipoBPropuesto" type="number" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 bg-white text-sm text-slate-900" />
-                </div>
               </div>
               <div v-if="!partido.equipoB || partido.equipoB.length === 0" class="text-xs" :style="teamBColor.subtitleStyle">Sin jugadores</div>
               <div v-else class="space-y-1.5">
@@ -1458,6 +1467,195 @@ const cerrarModalDiscusionResultado = () => {
             </div>
           </div>
 
+          <div class="rounded-lg border border-[color:var(--color-border)] bg-[color:rgba(102,63,77,0.28)] p-3">
+            <p class="text-xs font-semibold text-slate-700 mb-2">Leyenda</p>
+            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+              <span class="inline-flex items-center gap-1"><svg class="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.3l-6.16 3.24 1.18-6.88L2 8.86l6.92-1L12 1.6l3.08 6.26 6.92 1-5.02 4.8 1.18 6.88z"/></svg> Jugador diferencial</span>
+              <span class="inline-flex items-center gap-1"><svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V19c0 1.1.9 2 2 2h9c.82 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg> Buena actitud</span>
+              <span class="inline-flex items-center gap-1"><svg class="w-4 h-4 text-rose-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 3H6c-.82 0-1.54.5-1.84 1.22L1.14 11.27c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.3l-.95 4.57-.03.32c0 .41.17.79.44 1.06L10 23l6.41-6.41c.37-.37.59-.89.59-1.42V5c0-1.1-.9-2-2-2zm3 0v12h4V3h-4z"/></svg> Mala actitud</span>
+              <span class="inline-flex items-center gap-1"><AppIcon name="check" :size="14" class="text-emerald-700" /> Pista pagada</span>
+              <span class="inline-flex items-center gap-1"><AppIcon name="users" :size="14" /> Enviar amistad</span>
+            </div>
+          </div>
+
+          <section class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <article class="rounded-lg border-2 p-3 space-y-2" :style="teamAColor.cardStyle">
+              <div class="flex items-center justify-between gap-2">
+                <h4 class="font-bold" :style="teamAColor.titleStyle">Equipo {{ partido.colorEquipoA || 'A' }}</h4>
+              </div>
+              <div v-if="!partido.equipoA || partido.equipoA.length === 0" class="text-xs" :style="teamAColor.subtitleStyle">Sin jugadores</div>
+              <div v-else class="space-y-1.5">
+                <div v-for="jugador in partido.equipoA" :key="`voto-a-part-${jugador.id}`" :class="['rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5', esUsuarioActual(jugador.id) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : '']" :style="teamAColor.playerRowStyle">
+                  <span class="inline-flex items-center gap-1 text-xs font-medium truncate" :style="teamAColor.titleStyle">
+                    <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada"><AppIcon name="check" :size="10" /></span>
+                    <span>{{ jugador.nombre }}</span>
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      @click="toggleJugadorDiferencial(jugador.id)"
+                      :disabled="esUsuarioActual(jugador.id)"
+                      :class="[
+                        'h-7 w-7 rounded-md border flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed',
+                        esUsuarioActual(jugador.id)
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                            : (votacionForm.jugadoresDiferenciales.includes(jugador.id) ? 'bg-amber-500 text-white border-amber-500' : '')
+                      ]"
+                      :style="!esUsuarioActual(jugador.id) && !votacionForm.jugadoresDiferenciales.includes(jugador.id) ? teamAColor.controlIdleStyle : null"
+                      :title="esUsuarioActual(jugador.id) ? 'No puedes marcarte como diferencial' : 'Jugador diferencial'"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.3l-6.16 3.24 1.18-6.88L2 8.86l6.92-1L12 1.6l3.08 6.26 6.92 1-5.02 4.8 1.18 6.88z"/></svg>
+                    </button>
+                    <button
+                      v-if="esCompaneroAsignado(jugador.id)"
+                      type="button"
+                      @click="setValoracionCompanero(jugador.id, getValoracionCompanero(jugador.id) === 1 ? null : 1)"
+                      :class="['h-7 w-7 rounded-md border flex items-center justify-center transition', getValoracionCompanero(jugador.id) === 1 ? 'bg-emerald-600 text-white border-emerald-600' : '']"
+                      :style="getValoracionCompanero(jugador.id) === 1 ? null : teamAColor.controlIdleStyle"
+                      title="Buena actitud"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V19c0 1.1.9 2 2 2h9c.82 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+                    </button>
+                    <button
+                      v-if="esCompaneroAsignado(jugador.id)"
+                      type="button"
+                      @click="setValoracionCompanero(jugador.id, getValoracionCompanero(jugador.id) === -1 ? null : -1)"
+                      :class="['h-7 w-7 rounded-md border flex items-center justify-center transition', getValoracionCompanero(jugador.id) === -1 ? 'bg-rose-600 text-white border-rose-600' : '']"
+                      :style="getValoracionCompanero(jugador.id) === -1 ? null : teamAColor.controlIdleStyle"
+                      title="Mala actitud"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 3H6c-.82 0-1.54.5-1.84 1.22L1.14 11.27c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.3l-.95 4.57-.03.32c0 .41.17.79.44 1.06L10 23l6.41-6.41c.37-.37.59-.89.59-1.42V5c0-1.1-.9-2-2-2zm3 0v12h4V3h-4z"/></svg>
+                    </button>
+                    <div class="flex flex-col items-center gap-0.5">
+                      <button
+                        type="button"
+                        :disabled="obtenerEstadoAmistadJugador(jugador.id) !== 'disponible'"
+                        @click="enviarSolicitudAmistadVotacion(jugador.id)"
+                        :class="[
+                          'h-7 min-w-7 px-1.5 rounded-md border flex items-center justify-center transition disabled:cursor-not-allowed text-[10px] font-semibold',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'enviada' ? 'bg-[color:rgba(151,240,125,0.16)] border-[color:rgba(151,240,125,0.36)] text-[color:var(--color-secondary)]' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'self' ? 'bg-slate-100 border-slate-300 text-slate-500' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'enviando' ? 'bg-[color:rgba(151,240,125,0.16)] border-[color:rgba(151,240,125,0.36)] text-[color:var(--color-secondary)]' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'disponible' ? '' : '',
+                        ]"
+                        :style="obtenerEstadoAmistadJugador(jugador.id) === 'disponible' ? teamAColor.controlIdleStyle : null"
+                        :title="obtenerEstadoAmistadJugador(jugador.id) === 'self' ? 'No puedes enviarte amistad' : (obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'Ya sois amigos' : (obtenerEstadoAmistadJugador(jugador.id) === 'enviada' ? 'Solicitud ya enviada' : 'Enviar solicitud de amistad'))"
+                      >
+                        <AppIcon v-if="obtenerEstadoAmistadJugador(jugador.id) === 'amigo'" name="users" :size="12" class="text-emerald-700" />
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'enviada'">↗</span>
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'self'">—</span>
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'enviando'">...</span>
+                        <AppIcon v-else name="users" :size="12" />
+                      </button>
+                      <span
+                        v-if="textoEstadoAmistadJugador(jugador.id)"
+                        class="text-[9px] leading-none font-medium"
+                        :class="obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'text-emerald-700' : 'text-[color:var(--color-secondary)]'"
+                      >
+                        {{ textoEstadoAmistadJugador(jugador.id) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="rounded-lg border-2 p-3 space-y-2" :style="teamBColor.cardStyle">
+              <div class="flex items-center justify-between gap-2">
+                <h4 class="font-bold" :style="teamBColor.titleStyle">Equipo {{ partido.colorEquipoB || 'B' }}</h4>
+              </div>
+              <div v-if="!partido.equipoB || partido.equipoB.length === 0" class="text-xs" :style="teamBColor.subtitleStyle">Sin jugadores</div>
+              <div v-else class="space-y-1.5">
+                <div v-for="jugador in partido.equipoB" :key="`voto-b-part-${jugador.id}`" :class="['rounded-lg border px-2 py-1.5 flex items-center justify-between gap-1.5', esUsuarioActual(jugador.id) ? 'border-[color:var(--color-primary)] shadow-[0_0_0_2px_rgba(151,240,125,0.3)]' : '']" :style="teamBColor.playerRowStyle">
+                  <span class="inline-flex items-center gap-1 text-xs font-medium truncate" :style="teamBColor.titleStyle">
+                    <span v-if="usuarioPagoConfirmado(jugador.id)" class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700" title="Pista pagada"><AppIcon name="check" :size="10" /></span>
+                    <span>{{ jugador.nombre }}</span>
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      @click="toggleJugadorDiferencial(jugador.id)"
+                      :disabled="esUsuarioActual(jugador.id)"
+                      :class="[
+                        'h-7 w-7 rounded-md border flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed',
+                        esUsuarioActual(jugador.id)
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                            : (votacionForm.jugadoresDiferenciales.includes(jugador.id) ? 'bg-amber-500 text-white border-amber-500' : '')
+                      ]"
+                      :style="!esUsuarioActual(jugador.id) && !votacionForm.jugadoresDiferenciales.includes(jugador.id) ? teamBColor.controlIdleStyle : null"
+                      :title="esUsuarioActual(jugador.id) ? 'No puedes marcarte como diferencial' : 'Jugador diferencial'"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.3l-6.16 3.24 1.18-6.88L2 8.86l6.92-1L12 1.6l3.08 6.26 6.92 1-5.02 4.8 1.18 6.88z"/></svg>
+                    </button>
+                    <button
+                      v-if="esCompaneroAsignado(jugador.id)"
+                      type="button"
+                      @click="setValoracionCompanero(jugador.id, getValoracionCompanero(jugador.id) === 1 ? null : 1)"
+                      :class="['h-7 w-7 rounded-md border flex items-center justify-center transition', getValoracionCompanero(jugador.id) === 1 ? 'bg-emerald-600 text-white border-emerald-600' : '']"
+                      :style="getValoracionCompanero(jugador.id) === 1 ? null : teamBColor.controlIdleStyle"
+                      title="Buena actitud"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V19c0 1.1.9 2 2 2h9c.82 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+                    </button>
+                    <button
+                      v-if="esCompaneroAsignado(jugador.id)"
+                      type="button"
+                      @click="setValoracionCompanero(jugador.id, getValoracionCompanero(jugador.id) === -1 ? null : -1)"
+                      :class="['h-7 w-7 rounded-md border flex items-center justify-center transition', getValoracionCompanero(jugador.id) === -1 ? 'bg-rose-600 text-white border-rose-600' : '']"
+                      :style="getValoracionCompanero(jugador.id) === -1 ? null : teamBColor.controlIdleStyle"
+                      title="Mala actitud"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 3H6c-.82 0-1.54.5-1.84 1.22L1.14 11.27c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.3l-.95 4.57-.03.32c0 .41.17.79.44 1.06L10 23l6.41-6.41c.37-.37.59-.89.59-1.42V5c0-1.1-.9-2-2-2zm3 0v12h4V3h-4z"/></svg>
+                    </button>
+                    <div class="flex flex-col items-center gap-0.5">
+                      <button
+                        type="button"
+                        :disabled="obtenerEstadoAmistadJugador(jugador.id) !== 'disponible'"
+                        @click="enviarSolicitudAmistadVotacion(jugador.id)"
+                        :class="[
+                          'h-7 min-w-7 px-1.5 rounded-md border flex items-center justify-center transition disabled:cursor-not-allowed text-[10px] font-semibold',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'enviada' ? 'bg-[color:rgba(151,240,125,0.16)] border-[color:rgba(151,240,125,0.36)] text-[color:var(--color-secondary)]' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'self' ? 'bg-slate-100 border-slate-300 text-slate-500' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'enviando' ? 'bg-[color:rgba(151,240,125,0.16)] border-[color:rgba(151,240,125,0.36)] text-[color:var(--color-secondary)]' : '',
+                          obtenerEstadoAmistadJugador(jugador.id) === 'disponible' ? '' : '',
+                        ]"
+                        :style="obtenerEstadoAmistadJugador(jugador.id) === 'disponible' ? teamBColor.controlIdleStyle : null"
+                        :title="obtenerEstadoAmistadJugador(jugador.id) === 'self' ? 'No puedes enviarte amistad' : (obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'Ya sois amigos' : (obtenerEstadoAmistadJugador(jugador.id) === 'enviada' ? 'Solicitud ya enviada' : 'Enviar solicitud de amistad'))"
+                      >
+                        <AppIcon v-if="obtenerEstadoAmistadJugador(jugador.id) === 'amigo'" name="users" :size="12" class="text-emerald-700" />
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'enviada'">↗</span>
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'self'">—</span>
+                        <span v-else-if="obtenerEstadoAmistadJugador(jugador.id) === 'enviando'">...</span>
+                        <AppIcon v-else name="users" :size="12" />
+                      </button>
+                      <span
+                        v-if="textoEstadoAmistadJugador(jugador.id)"
+                        class="text-[9px] leading-none font-medium"
+                        :class="obtenerEstadoAmistadJugador(jugador.id) === 'amigo' ? 'text-emerald-700' : 'text-[color:var(--color-secondary)]'"
+                      >
+                        {{ textoEstadoAmistadJugador(jugador.id) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <div class="text-xs text-slate-500">
+            Puedes votar a cualquier jugador del partido excepto a ti mismo.
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <BaseButton variant="secondary" :loading="guardandoVotacion" @click="guardarVotacion">
+              Guardar votos de jugadores
+            </BaseButton>
+          </div>
+
+          <p v-if="mensajeVotacion" class="text-sm font-medium text-slate-700">{{ mensajeVotacion }}</p>
+
         </div>
 
       </section>
@@ -1485,7 +1683,7 @@ const cerrarModalDiscusionResultado = () => {
             </label>
           </div>
 
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Intensidad del partido</label>
               <select v-model="votacionForm.intensidadPartido" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
@@ -1517,31 +1715,6 @@ const cerrarModalDiscusionResultado = () => {
                   ]"
                 >
                   No
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1">¿Partido alterado?</label>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  @click="votacionForm.partidoAlterado = false"
-                  :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
-                    !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
-                  ]"
-                >
-                  No
-                </button>
-                <button
-                  type="button"
-                  @click="votacionForm.partidoAlterado = true"
-                  :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
-                    votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
-                  ]"
-                >
-                  Sí
                 </button>
               </div>
             </div>
