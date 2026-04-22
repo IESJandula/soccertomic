@@ -934,6 +934,10 @@ const handleGoBack = () => {
 }
 
 const abrirModalDiscusionResultado = () => {
+  if (actaCerrada.value) {
+    uiStore.showToast({ message: 'El acta está cerrada. Ya no se puede discutir el resultado.', type: 'warning' })
+    return
+  }
   mostrarModalDiscusionResultado.value = true
 }
 
@@ -1083,29 +1087,29 @@ const cerrarModalDiscusionResultado = () => {
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
                 <span class="block text-xs text-slate-600 mb-1">Goles equipo A</span>
-                <input v-model.number="resultadoOficialForm.golesEquipoA" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                <input v-model.number="resultadoOficialForm.golesEquipoA" :disabled="actaCerrada" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100" />
               </label>
               <label class="block">
                 <span class="block text-xs text-slate-600 mb-1">Goles equipo B</span>
-                <input v-model.number="resultadoOficialForm.golesEquipoB" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                <input v-model.number="resultadoOficialForm.golesEquipoB" :disabled="actaCerrada" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100" />
               </label>
             </div>
             <div v-if="marcadoresPropuestos.length" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-end">
               <label class="block">
                 <span class="block text-xs text-slate-600 mb-1">Marcadores propuestos por participantes</span>
-                <select v-model="marcadorPropuestoSeleccionado" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                <select v-model="marcadorPropuestoSeleccionado" :disabled="actaCerrada" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100">
                   <option value="">Selecciona un marcador</option>
                   <option v-for="marcador in marcadoresPropuestos" :key="marcador.value" :value="marcador.value">
                     {{ marcador.label }}
                   </option>
                 </select>
               </label>
-              <BaseButton size="sm" variant="secondary" :disabled="!marcadorPropuestoSeleccionado" @click="aplicarMarcadorPropuesto">
+              <BaseButton size="sm" variant="secondary" :disabled="actaCerrada || !marcadorPropuestoSeleccionado" @click="aplicarMarcadorPropuesto">
                 Usar marcador
               </BaseButton>
             </div>
             <div class="flex justify-end">
-              <BaseButton size="sm" :loading="guardandoResultadoOficial" :disabled="guardandoResultadoOficial" @click="guardarResultadoOficial">
+              <BaseButton size="sm" :loading="guardandoResultadoOficial" :disabled="guardandoResultadoOficial || actaCerrada" @click="guardarResultadoOficial">
                 Guardar resultado oficial
               </BaseButton>
             </div>
@@ -1114,7 +1118,7 @@ const cerrarModalDiscusionResultado = () => {
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Intensidad del partido</label>
-              <select v-model="votacionForm.intensidadPartido" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+              <select v-model="votacionForm.intensidadPartido" :disabled="actaCerrada" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white disabled:cursor-not-allowed disabled:bg-slate-100">
                 <option value="BAJO">Bajo</option>
                 <option value="MEDIO">Medio</option>
                 <option value="ALTO">Alto</option>
@@ -1126,9 +1130,10 @@ const cerrarModalDiscusionResultado = () => {
               <div class="flex items-center gap-2">
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoFueParejo = true"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     votacionForm.partidoFueParejo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1136,9 +1141,10 @@ const cerrarModalDiscusionResultado = () => {
                 </button>
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoFueParejo = false"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     !votacionForm.partidoFueParejo ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1151,9 +1157,10 @@ const cerrarModalDiscusionResultado = () => {
               <div class="flex items-center gap-2">
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoAlterado = false"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     !votacionForm.partidoAlterado ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1161,9 +1168,10 @@ const cerrarModalDiscusionResultado = () => {
                 </button>
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoAlterado = true"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     votacionForm.partidoAlterado ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1354,7 +1362,7 @@ const cerrarModalDiscusionResultado = () => {
             Puedes votar a cualquier jugador del partido excepto a ti mismo.
           </div>
 
-          <BaseButton @click="guardarVotacion" :loading="guardandoVotacion">
+          <BaseButton @click="guardarVotacion" :loading="guardandoVotacion" :disabled="actaCerrada">
             {{ miVoto ? 'Actualizar votación' : 'Enviar votación' }}
           </BaseButton>
 
@@ -1365,14 +1373,14 @@ const cerrarModalDiscusionResultado = () => {
               <h4 class="text-sm font-semibold text-slate-800">Resumen compartido de votación</h4>
             </div>
 
-            <div v-if="partido?.estado === 'FINALIZADO' && !partido?.ratingProcesado" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p class="text-xs text-slate-600">El partido ya finalizó. Si quieres cerrar el rating oficial, hazlo manualmente.</p>
-              <BaseButton size="sm" :loading="procesandoRating" :disabled="procesandoRating" @click="procesarRatingPartido">
-                Procesar rating
+            <div v-if="partido?.estado === 'FINALIZADO' && !actaCerrada" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p class="text-xs text-slate-600">El partido ya finalizó. Cierra el acta para bloquear cambios y procesar el cierre oficial.</p>
+              <BaseButton size="sm" :loading="cerrandoActa" :disabled="cerrandoActa" @click="cerrarActaPartido">
+                Cerrar acta
               </BaseButton>
             </div>
-            <div v-else-if="partido?.ratingProcesado" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-              El rating oficial ya fue procesado.
+            <div v-else-if="actaCerrada" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              Acta cerrada: cambios y votaciones bloqueados.
             </div>
 
             <div :class="['w-full rounded-xl px-3 py-2.5 grid grid-cols-2 gap-2 items-center', resultadoBanner.clase]">
@@ -1421,7 +1429,7 @@ const cerrarModalDiscusionResultado = () => {
           <div v-if="resumenVotacion" class="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
             <div class="flex items-start justify-between gap-2">
               <h4 class="text-sm font-semibold text-slate-800">Resumen compartido de votación</h4>
-              <BaseButton size="sm" variant="secondary" @click="abrirModalDiscusionResultado">
+              <BaseButton size="sm" variant="secondary" :disabled="actaCerrada" @click="abrirModalDiscusionResultado">
                 Discutir resultado
               </BaseButton>
             </div>
@@ -1649,7 +1657,7 @@ const cerrarModalDiscusionResultado = () => {
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <BaseButton variant="secondary" :loading="guardandoVotacion" @click="guardarVotacion">
+            <BaseButton variant="secondary" :loading="guardandoVotacion" :disabled="actaCerrada" @click="guardarVotacion">
               Guardar votos de jugadores
             </BaseButton>
           </div>
@@ -1661,7 +1669,7 @@ const cerrarModalDiscusionResultado = () => {
       </section>
     </template>
 
-    <div v-if="mostrarModalDiscusionResultado" class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+    <div v-if="mostrarModalDiscusionResultado && !actaCerrada" class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
       <div class="card-surface w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div>
@@ -1675,18 +1683,18 @@ const cerrarModalDiscusionResultado = () => {
           <div class="grid grid-cols-2 gap-2">
             <label class="block">
               <span class="block text-xs font-medium text-slate-700 mb-1">Goles equipo A</span>
-              <input v-model.number="votacionForm.golesEquipoAPropuesto" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+              <input v-model.number="votacionForm.golesEquipoAPropuesto" :disabled="actaCerrada" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100" />
             </label>
             <label class="block">
               <span class="block text-xs font-medium text-slate-700 mb-1">Goles equipo B</span>
-              <input v-model.number="votacionForm.golesEquipoBPropuesto" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+              <input v-model.number="votacionForm.golesEquipoBPropuesto" :disabled="actaCerrada" type="number" min="0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100" />
             </label>
           </div>
 
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Intensidad del partido</label>
-              <select v-model="votacionForm.intensidadPartido" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+              <select v-model="votacionForm.intensidadPartido" :disabled="actaCerrada" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white disabled:cursor-not-allowed disabled:bg-slate-100">
                 <option value="BAJO">Bajo</option>
                 <option value="MEDIO">Medio</option>
                 <option value="ALTO">Alto</option>
@@ -1698,9 +1706,10 @@ const cerrarModalDiscusionResultado = () => {
               <div class="flex items-center gap-2">
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoFueParejo = true"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     votacionForm.partidoFueParejo ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1708,9 +1717,10 @@ const cerrarModalDiscusionResultado = () => {
                 </button>
                 <button
                   type="button"
+                  :disabled="actaCerrada"
                   @click="votacionForm.partidoFueParejo = false"
                   :class="[
-                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition',
+                    'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
                     !votacionForm.partidoFueParejo ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-300'
                   ]"
                 >
@@ -1722,7 +1732,7 @@ const cerrarModalDiscusionResultado = () => {
 
           <div class="flex items-center justify-end gap-2">
             <BaseButton variant="secondary" @click="cerrarModalDiscusionResultado">Cancelar</BaseButton>
-            <BaseButton :loading="guardandoVotacion" @click="guardarVotacion">Enviar votación</BaseButton>
+            <BaseButton :loading="guardandoVotacion" :disabled="actaCerrada" @click="guardarVotacion">Enviar votación</BaseButton>
           </div>
         </div>
       </div>
