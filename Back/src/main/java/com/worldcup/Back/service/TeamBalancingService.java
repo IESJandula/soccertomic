@@ -3,6 +3,7 @@ package com.worldcup.Back.service;
 import com.worldcup.Back.entity.PartidoEntity;
 import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.dto.response.BalanceResultDTO;
+import com.worldcup.Back.service.level.VisibleLevelService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TeamBalancingService {
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private VisibleLevelService visibleLevelService;
 
     /**
      * Assign positions to existing teams WITHOUT redistributing players
@@ -86,7 +90,7 @@ public class TeamBalancingService {
             throw new IllegalArgumentException("Se necesitan al menos 2 jugadores para balancear equipos");
         }
 
-        // Step 1: Sort by global rating (descending)
+        // Step 1: Sort by visible TrueSkill level (descending)
         List<UsuarioEntity> sortedByRating = procesarJugadores(jugadores);
 
         // Step 2: Apply snake draft
@@ -133,19 +137,14 @@ public class TeamBalancingService {
     }
 
     /**
-     * Process and sort players by criteria
-     * Players without PlayerProfile are assigned default rating of 3.0
+     * Process and sort players by visible TrueSkill level
      */
     private List<UsuarioEntity> procesarJugadores(List<UsuarioEntity> jugadores) {
         return jugadores.stream()
                 .sorted((a, b) -> {
-                    Float ratingA = (a.getPlayerProfile() != null && a.getPlayerProfile().getGlobalRating() != null)
-                        ? a.getPlayerProfile().getGlobalRating() 
-                        : 3.0f;
-                    Float ratingB = (b.getPlayerProfile() != null && b.getPlayerProfile().getGlobalRating() != null)
-                        ? b.getPlayerProfile().getGlobalRating() 
-                        : 3.0f;
-                    return ratingB.compareTo(ratingA); // Descending
+                    Integer levelA = getVisibleLevel(a);
+                    Integer levelB = getVisibleLevel(b);
+                    return levelB.compareTo(levelA);
                 })
                 .collect(Collectors.toList());
     }
@@ -175,8 +174,8 @@ public class TeamBalancingService {
      * Only reorder if rating difference is significant
      */
     private void refinamientoEquipos(List<UsuarioEntity> equipoA, List<UsuarioEntity> equipoB) {
-        Float avgA = calcularPromedioRating(equipoA);
-        Float avgB = calcularPromedioRating(equipoB);
+        Float avgA = calcularPromedioNivelVisible(equipoA);
+        Float avgB = calcularPromedioNivelVisible(equipoB);
         Float diferencia = Math.abs(avgA - avgB);
 
         // If difference > 0.5, try to swap similar-rated players
@@ -186,8 +185,8 @@ public class TeamBalancingService {
                 improved = false;
                 for (int i = 0; i < equipoA.size(); i++) {
                     for (int j = 0; j < equipoB.size(); j++) {
-                        Float ratingAi = getRating(equipoA.get(i));
-                        Float ratingBj = getRating(equipoB.get(j));
+                        Float ratingAi = getVisibleLevel(equipoA.get(i)).floatValue();
+                        Float ratingBj = getVisibleLevel(equipoB.get(j)).floatValue();
 
                         // Calculate balance after swap
                         Float newAvgA = (avgA - ratingAi + ratingBj) / equipoA.size();
@@ -288,27 +287,26 @@ public class TeamBalancingService {
 
     /**
      * Compare two players for position suitability
-     * Primary: defenders (high defense), forwards (high shooting)
-     * Secondary: balance with play style (O/D/A)
+     * Primary: goalkeeper availability, then preferred football role
      */
     private int compararJugadoresParaPosicion(UsuarioEntity a, UsuarioEntity b) {
-        Integer defensaA = (a.getPlayerProfile() != null && a.getPlayerProfile().getDefense() != null) 
-            ? a.getPlayerProfile().getDefense() : 3;
-        Integer defensaB = (b.getPlayerProfile() != null && b.getPlayerProfile().getDefense() != null) 
-            ? b.getPlayerProfile().getDefense() : 3;
-        Integer disparoA = (a.getPlayerProfile() != null && a.getPlayerProfile().getShooting() != null) 
-            ? a.getPlayerProfile().getShooting() : 3;
-        Integer disparoB = (b.getPlayerProfile() != null && b.getPlayerProfile().getShooting() != null) 
-            ? b.getPlayerProfile().getShooting() : 3;
+        Boolean gkA = a.getPlayerProfile() != null && Boolean.TRUE.equals(a.getPlayerProfile().getGoalkeeper());
+        Boolean gkB = b.getPlayerProfile() != null && Boolean.TRUE.equals(b.getPlayerProfile().getGoalkeeper());
 
-        // Defenders should have high defense
-        if (!defensaA.equals(defensaB)) {
-            return defensaB.compareTo(defensaA); // Descending
+        if (!gkA.equals(gkB)) {
+            return Boolean.compare(gkB, gkA);
         }
 
-        // Forwards should have high shooting
-        if (!disparoA.equals(disparoB)) {
-            return disparoB.compareTo(disparoA); // Descending
+        Integer posicionA = posicionPrioridad(a);
+        Integer posicionB = posicionPrioridad(b);
+        if (!posicionA.equals(posicionB)) {
+            return posicionA.compareTo(posicionB);
+        }
+
+        Integer levelA = getVisibleLevel(a);
+        Integer levelB = getVisibleLevel(b);
+        if (!levelA.equals(levelB)) {
+            return levelB.compareTo(levelA);
         }
 
         return 0;
@@ -321,8 +319,8 @@ public class TeamBalancingService {
         BalanceMetrics metricas = new BalanceMetrics();
 
         // Rating balance
-        Float avgA = calcularPromedioRating(equipoA);
-        Float avgB = calcularPromedioRating(equipoB);
+        Float avgA = calcularPromedioNivelVisible(equipoA);
+        Float avgB = calcularPromedioNivelVisible(equipoB);
         Float diferenciaRating = Math.abs(avgA - avgB);
 
         metricas.setPromedioRatingEquipoA(avgA);
@@ -457,23 +455,39 @@ public class TeamBalancingService {
     /**
      * Calculate average rating of team
      */
-    private Float calcularPromedioRating(List<UsuarioEntity> equipo) {
+    private Float calcularPromedioNivelVisible(List<UsuarioEntity> equipo) {
         if (equipo.isEmpty()) return 0f;
 
         return (float) equipo.stream()
-                .mapToDouble(u -> getRating(u))
+                .mapToDouble(u -> getVisibleLevel(u))
                 .average()
                 .orElse(3.0);
     }
 
-    /**
-     * Get rating from user, with fallback to 3.0
-     */
-    private Float getRating(UsuarioEntity usuario) {
-        if (usuario.getPlayerProfile() != null && usuario.getPlayerProfile().getGlobalRating() != null) {
-            return usuario.getPlayerProfile().getGlobalRating();
+    private Integer getVisibleLevel(UsuarioEntity usuario) {
+        if (usuario == null) {
+            return 0;
         }
-        return 3.0f;
+        return Math.max(0, visibleLevelService.calcularNivelVisible(usuario).setScale(0, java.math.RoundingMode.HALF_UP).intValue());
+    }
+
+    private Integer posicionPrioridad(UsuarioEntity usuario) {
+        if (usuario == null || usuario.getPlayerProfile() == null) {
+            return 99;
+        }
+
+        String posicion = usuario.getPlayerProfile().getPosicionPreferida();
+        if (posicion == null) {
+            return 99;
+        }
+
+        return switch (posicion.trim().toUpperCase()) {
+            case "PORTERO" -> 0;
+            case "DEFENSA" -> 1;
+            case "MEDIOCAMPISTA" -> 2;
+            case "DELANTERO" -> 3;
+            default -> 99;
+        };
     }
 
     // ==================== Helper Classes ====================

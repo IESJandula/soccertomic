@@ -8,12 +8,14 @@ import com.worldcup.Back.entity.UsuarioEntity;
 import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.repository.UsuarioRepository;
 import com.worldcup.Back.security.FirebaseRequestContext;
+import com.worldcup.Back.service.level.VisibleLevelService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.hibernate.LazyInitializationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +27,9 @@ public class UserService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private VisibleLevelService visibleLevelService;
 
     public List<UsuarioEntity> listarUsuarios(){
         return usuarioRepository.findAll();
@@ -132,6 +137,11 @@ public class UserService {
         Long id = lazySafe(usuario::getId, null);
         String nombre = lazySafe(usuario::getNombre, null);
         String nivel = lazySafe(usuario::getNivel, null);
+        BigDecimal nivelVisible = lazySafe(() -> visibleLevelService.calcularNivelVisible(usuario), BigDecimal.ZERO);
+        BigDecimal ratingSigma = lazySafe(usuario::getRatingSigma, new BigDecimal("8.33"));
+        BigDecimal fiabilidadScore = lazySafe(usuario::getFiabilidadScore, BigDecimal.ONE);
+        String fiabilidadLabel = lazySafe(() -> visibleLevelService.calcularFiabilidadLabel(usuario), "MEDIA");
+        Integer partidosJugados = lazySafe(usuario::getPartidosJugados, 0);
         Integer reputacionPositiva = lazySafe(usuario::getReputacionPositiva, null);
         List<String> rasgos = lazySafe(usuario::getRasgos, List.of());
         
@@ -140,6 +150,11 @@ public class UserService {
                 nombre,
                 emailContexto,
                 nivel,
+                nivelVisible,
+                ratingSigma,
+                fiabilidadScore,
+                fiabilidadLabel,
+                partidosJugados,
                 reputacionPositiva,
                 rasgos,
                 playTendency

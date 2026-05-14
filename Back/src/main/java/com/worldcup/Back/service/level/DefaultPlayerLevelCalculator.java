@@ -8,11 +8,8 @@ public class DefaultPlayerLevelCalculator implements PlayerLevelCalculator {
 
     @Override
     public int calculate(PlayerProfileEntity profile) {
-        // Convertir globalRating (0-5) a escala de nivel (1-10)
-        if (profile.getGlobalRating() != null) {
-            return Math.round(profile.getGlobalRating() * 2);
-        }
-        return 5; // Default if no rating
+        // El nivel visible se calcula desde TrueSkill a nivel de usuario; aquí dejamos un valor neutro.
+        return 5;
     }
 
     @Override

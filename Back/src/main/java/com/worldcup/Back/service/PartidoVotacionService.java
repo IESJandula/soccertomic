@@ -97,7 +97,7 @@ public class PartidoVotacionService {
         autoFinalizarSiCorresponde(partido);
         validarPermisosYEstado(partido, votante);
 
-        if (Boolean.TRUE.equals(partido.getArchivado())) {
+        if (Boolean.TRUE.equals(partido.getArchivado()) || Boolean.TRUE.equals(partido.getRatingProcesado())) {
             throw new RuntimeException("El acta está cerrada y ya no admite más votaciones");
         }
 
@@ -107,11 +107,6 @@ public class PartidoVotacionService {
         List<UsuarioEntity> participantes = obtenerParticipantesOrdenados(partido);
         List<UsuarioEntity> asignados = obtenerCompanerosAsignados(participantes, votante.getId());
         validarVotacion(partido, votante, dto, participantes, asignados);
-
-        Map<Long, Integer> valoracionesPrevias = entity.getValoracionesCompaneros() == null
-            ? Map.of()
-            : entity.getValoracionesCompaneros().stream()
-                .collect(Collectors.toMap(PartidoCompaneroValoradoEmbeddable::getJugadorId, PartidoCompaneroValoradoEmbeddable::getPuntuacion, (a, b) -> b));
 
         entity.setPartido(partido);
         entity.setVotante(votante);
@@ -125,7 +120,6 @@ public class PartidoVotacionService {
         entity.setActualizadaEn(LocalDateTime.now());
 
         PartidoVotacionEntity saved = partidoVotacionRepository.save(entity);
-        aplicarImpactoReputacion(valoracionesPrevias, saved.getValoracionesCompaneros());
         return toResponse(saved, asignados);
     }
 
@@ -213,10 +207,11 @@ public class PartidoVotacionService {
 
         Map<Long, List<Integer>> valoracionCompaneros = new HashMap<>();
         for (PartidoVotacionEntity voto : votos) {
-            for (PartidoCompaneroValoradoEmbeddable valoracion : voto.getValoracionesCompaneros()) {
+            Map<Long, Integer> valoracionesNormalizadas = consolidarValoracionesCompaneros(voto.getValoracionesCompaneros());
+            for (Map.Entry<Long, Integer> valoracion : valoracionesNormalizadas.entrySet()) {
                 valoracionCompaneros
-                        .computeIfAbsent(valoracion.getJugadorId(), ignored -> new ArrayList<>())
-                        .add(valoracion.getPuntuacion());
+                        .computeIfAbsent(valoracion.getKey(), ignored -> new ArrayList<>())
+                        .add(valoracion.getValue());
             }
         }
 
@@ -329,7 +324,7 @@ public class PartidoVotacionService {
             return;
         }
 
-        Map<Long, Integer> enviados = new LinkedHashMap<>();
+        Set<Long> enviados = new HashSet<>();
         for (PartidoCompaneroValoracionRequestDTO valoracion : dto.getValoracionesCompaneros()) {
             if (valoracion.getJugadorId().equals(votante.getId())) {
                 throw new IllegalArgumentException("No puedes valorarte a ti mismo");
@@ -340,7 +335,9 @@ public class PartidoVotacionService {
             if (valoracion.getPuntuacion() == null || (valoracion.getPuntuacion() != 1 && valoracion.getPuntuacion() != -1)) {
                 throw new IllegalArgumentException("Cada valoración de compañero debe ser pulgar arriba o abajo");
             }
-            enviados.put(valoracion.getJugadorId(), valoracion.getPuntuacion());
+            if (!enviados.add(valoracion.getJugadorId())) {
+                throw new IllegalArgumentException("No puedes valorar dos veces al mismo compañero");
+            }
         }
     }
 
@@ -389,51 +386,6 @@ public class PartidoVotacionService {
                 .toList();
     }
 
-    private void aplicarImpactoReputacion(Map<Long, Integer> valoracionesPrevias,
-                                          List<PartidoCompaneroValoradoEmbeddable> valoracionesNuevas) {
-        Map<Long, Integer> nuevas = valoracionesNuevas == null
-                ? Map.of()
-                : valoracionesNuevas.stream()
-                    .collect(Collectors.toMap(PartidoCompaneroValoradoEmbeddable::getJugadorId, PartidoCompaneroValoradoEmbeddable::getPuntuacion, (a, b) -> b));
-
-        Set<Long> jugadoresAjustar = new HashSet<>();
-        jugadoresAjustar.addAll(valoracionesPrevias.keySet());
-        jugadoresAjustar.addAll(nuevas.keySet());
-
-        if (jugadoresAjustar.isEmpty()) {
-            return;
-        }
-
-        List<UsuarioEntity> usuarios = usuarioRepository.findAllById(jugadoresAjustar);
-        for (UsuarioEntity usuario : usuarios) {
-            int previo = valoracionesPrevias.getOrDefault(usuario.getId(), 0);
-            int nuevo = nuevas.getOrDefault(usuario.getId(), 0);
-
-            int deltaReputacion = nuevo - previo;
-            if (deltaReputacion != 0) {
-                int reputacionActual = usuario.getReputacionPositiva() == null ? 0 : usuario.getReputacionPositiva();
-                usuario.setReputacionPositiva(Math.max(0, reputacionActual + deltaReputacion));
-
-                int puntosActuales = usuario.getPuntos() == null ? 0 : usuario.getPuntos();
-                usuario.setPuntos(Math.max(0, puntosActuales + (deltaReputacion * 2)));
-                usuario.setNivel(calcularNivelPorReputacion(usuario.getReputacionPositiva()));
-            }
-        }
-
-        usuarioRepository.saveAll(usuarios);
-    }
-
-    private String calcularNivelPorReputacion(Integer reputacionPositiva) {
-        int reputacion = reputacionPositiva == null ? 0 : reputacionPositiva;
-        if (reputacion >= 50) {
-            return "avanzado";
-        }
-        if (reputacion >= 20) {
-            return "intermedio";
-        }
-        return "beginner";
-    }
-
     private List<Long> normalizarIds(List<Long> ids) {
         if (ids == null) {
             return List.of();
@@ -441,28 +393,52 @@ public class PartidoVotacionService {
         return ids.stream().filter(id -> id != null && id > 0).distinct().toList();
     }
 
+    private Map<Long, Integer> consolidarValoracionesCompaneros(List<PartidoCompaneroValoradoEmbeddable> valoraciones) {
+        if (valoraciones == null || valoraciones.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Integer> consolidadas = new LinkedHashMap<>();
+        for (PartidoCompaneroValoradoEmbeddable valoracion : valoraciones) {
+            if (valoracion == null || valoracion.getJugadorId() == null || valoracion.getPuntuacion() == null) {
+                continue;
+            }
+            consolidadas.put(valoracion.getJugadorId(), valoracion.getPuntuacion());
+        }
+        return consolidadas;
+    }
+
     private List<PartidoCompaneroValoradoEmbeddable> mapearValoraciones(List<PartidoCompaneroValoracionRequestDTO> valoraciones) {
         if (valoraciones == null) {
             return new ArrayList<>();
         }
 
-        return valoraciones.stream()
-                .filter(v -> v.getJugadorId() != null && v.getPuntuacion() != null)
-                .map(v -> new PartidoCompaneroValoradoEmbeddable(v.getJugadorId(), v.getPuntuacion()))
-                .collect(Collectors.toCollection(ArrayList::new));
+        Map<Long, Integer> consolidadas = new LinkedHashMap<>();
+        for (PartidoCompaneroValoracionRequestDTO valoracion : valoraciones) {
+            if (valoracion == null || valoracion.getJugadorId() == null || valoracion.getPuntuacion() == null) {
+                continue;
+            }
+            consolidadas.put(valoracion.getJugadorId(), valoracion.getPuntuacion());
+        }
+
+        return consolidadas.entrySet().stream()
+                .map(entry -> new PartidoCompaneroValoradoEmbeddable(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private PartidoVotacionResponseDTO toResponse(PartidoVotacionEntity entity, List<UsuarioEntity> asignados) {
+        Map<Long, Integer> valoracionesNormalizadas = consolidarValoracionesCompaneros(entity.getValoracionesCompaneros());
+
         Map<Long, String> nombres = usuarioRepository
-                .findAllById(entity.getValoracionesCompaneros().stream().map(PartidoCompaneroValoradoEmbeddable::getJugadorId).toList())
+                .findAllById(valoracionesNormalizadas.keySet())
                 .stream()
                 .collect(Collectors.toMap(UsuarioEntity::getId, UsuarioEntity::getNombre));
 
-        List<PartidoCompaneroValoracionDTO> valoracionesCompaneros = entity.getValoracionesCompaneros().stream()
+        List<PartidoCompaneroValoracionDTO> valoracionesCompaneros = valoracionesNormalizadas.entrySet().stream()
                 .map(v -> new PartidoCompaneroValoracionDTO(
-                        v.getJugadorId(),
-                        nombres.getOrDefault(v.getJugadorId(), "Jugador " + v.getJugadorId()),
-                        v.getPuntuacion()
+                        v.getKey(),
+                        nombres.getOrDefault(v.getKey(), "Jugador " + v.getKey()),
+                        v.getValue()
                 ))
                 .toList();
 

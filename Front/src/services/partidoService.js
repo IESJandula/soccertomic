@@ -171,13 +171,6 @@ class PartidoService {
     })
   }
 
-  async procesarRatingPartido(partidoId) {
-    return apiService.request(`${ENDPOINTS.PARTIDOS}/${partidoId}/rating/procesar`, {
-      method: 'POST',
-      useCache: false,
-    })
-  }
-
   async actualizarResultadoOficial(partidoId, golesEquipoA, golesEquipoB) {
     return apiService.request(ENDPOINTS.PARTIDOS_RESULTADO_OFICIAL(partidoId), {
       method: 'PUT',

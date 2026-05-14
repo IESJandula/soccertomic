@@ -8,6 +8,7 @@ import com.worldcup.Back.exception.ResourceNotFoundException;
 import com.worldcup.Back.repository.PlayerProfileRepository;
 import com.worldcup.Back.repository.UsuarioRepository;
 import com.worldcup.Back.service.level.PartidoRatingEngineService;
+import com.worldcup.Back.service.level.VisibleLevelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,9 @@ public class PlayerProfileService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private VisibleLevelService visibleLevelService;
 
     @Transactional
     public PlayerProfileResponseDTO saveOrUpdateProfile(String firebaseUid, PlayerProfileRequestDTO request) {
@@ -89,27 +93,16 @@ public class PlayerProfileService {
 
     @Transactional(readOnly = true)
     public int getPlayerLevel(UsuarioEntity usuario) {
-        Optional<PlayerProfileEntity> profile = findByUsuarioId(usuario.getId());
-        if (profile.isPresent() && profile.get().getGlobalRating() != null) {
-            // Convertir globalRating (0-5) a escala de nivel (1-10)
-            return Math.round(profile.get().getGlobalRating() * 2);
+        if (usuario == null) {
+            return 5;
         }
-        // Fallback: retornar 5 como nivel por defecto
-        return 5;
+        return Math.max(1, visibleLevelService.calcularNivelVisible(usuario).setScale(0, RoundingMode.HALF_UP).intValue());
     }
 
     private void mapAttributes(PlayerProfileEntity entity, PlayerProfileRequestDTO.AttributesDTO attributes) {
         if (attributes == null) {
             return;
         }
-
-        entity.setShooting(normalizeSkill(attributes.getShooting(), entity.getShooting()));
-        entity.setSpeed(normalizeSkill(attributes.getSpeed(), entity.getSpeed()));
-        entity.setDribbling(normalizeSkill(attributes.getDribbling(), entity.getDribbling()));
-        entity.setDefense(normalizeSkill(attributes.getDefense(), entity.getDefense()));
-        entity.setStrength(normalizeSkill(attributes.getStrength(), entity.getStrength()));
-        entity.setStamina(normalizeSkill(attributes.getStamina(), entity.getStamina()));
-        entity.setAerial(normalizeSkill(attributes.getAerial(), entity.getAerial()));
 
         String posicion = firstNonBlank(attributes.getPosicionPreferida(), entity.getPosicionPreferida(), "MEDIOCAMPISTA");
         entity.setPosicionPreferida(posicion);
@@ -145,7 +138,6 @@ public class PlayerProfileService {
         }
 
         entity.setPlayTendency(calculatePlayTendency(entity.getPlayStyle()));
-        entity.setGlobalRating(calculateGlobalRating(entity));
     }
 
     private PlayerProfileResponseDTO toResponse(PlayerProfileEntity profile) {
@@ -154,13 +146,6 @@ public class PlayerProfileService {
         response.setActualizadoEn(profile.getActualizadoEn());
 
         PlayerProfileResponseDTO.AttributesDTO attributes = new PlayerProfileResponseDTO.AttributesDTO();
-        attributes.setShooting(profile.getShooting());
-        attributes.setSpeed(profile.getSpeed());
-        attributes.setDribbling(profile.getDribbling());
-        attributes.setDefense(profile.getDefense());
-        attributes.setStrength(profile.getStrength());
-        attributes.setStamina(profile.getStamina());
-        attributes.setAerial(profile.getAerial());
         attributes.setGoalkeeper(profile.getGoalkeeper());
         attributes.setPosicionPreferida(profile.getPosicionPreferida());
         attributes.setPlayStyle(profile.getPlayStyle());
@@ -168,7 +153,6 @@ public class PlayerProfileService {
         attributes.setPlayTendency(profile.getPlayTendency());
         attributes.setAgeRange(profile.getAgeRange());
         attributes.setSelfAssessment(profile.getSelfAssessment());
-        attributes.setGlobalRating(profile.getGlobalRating());
         attributes.setPiernaBuena(profile.getPiernaBuena());
         
         // Convert comma-separated string back to list
@@ -179,35 +163,6 @@ public class PlayerProfileService {
         response.setAttributes(attributes);
 
         return response;
-    }
-
-    private Float calculateGlobalRating(PlayerProfileEntity profile) {
-        int shooting = normalizeSkill(profile.getShooting(), 3);
-        int speed = normalizeSkill(profile.getSpeed(), 3);
-        int dribbling = normalizeSkill(profile.getDribbling(), 3);
-        int defense = normalizeSkill(profile.getDefense(), 3);
-        int strength = normalizeSkill(profile.getStrength(), 3);
-        int stamina = normalizeSkill(profile.getStamina(), 3);
-        int aerial = normalizeSkill(profile.getAerial(), 3);
-
-        int sum = shooting + speed + dribbling + defense + strength + stamina + aerial;
-        float baseRating = (float) sum / 7;
-        
-        // Añadir modificador según skillTier
-        float tierModifier = 0;
-        if (profile.getSkillTier() != null) {
-            switch (profile.getSkillTier()) {
-                case "BRONCE": tierModifier = -1; break;
-                case "PLATA": tierModifier = 1; break;
-                case "ORO": tierModifier = 3; break;
-                case "DIAMANTE": tierModifier = 5; break;
-                default: tierModifier = 0; break;
-            }
-        }
-        
-        // Calcular rating final y redondear a 1 decimal
-        float finalRating = baseRating + tierModifier;
-        return Math.round(finalRating * 10) / 10f;
     }
 
     private String calculatePlayTendency(String playStyle) {
@@ -221,17 +176,6 @@ public class PlayerProfileService {
             return "DEFENSIVA";
         }
         return "ADAPTABLE";
-    }
-
-    private int normalizeSkill(Integer value, Integer fallback) {
-        int source = value != null ? value : (fallback != null ? fallback : 3);
-        if (source < 0) {
-            return 0;
-        }
-        if (source > 5) {
-            return 5;
-        }
-        return source;
     }
 
     private String normalizePlayStyle(String value, String fallback) {

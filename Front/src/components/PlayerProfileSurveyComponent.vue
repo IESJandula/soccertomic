@@ -6,7 +6,6 @@ import { usePlayerProfileStore } from '../stores/playerProfile'
 import apiService from '../services/apiService'
 import BaseButton from './ui/BaseButton.vue'
 import PlaystyleSelector from './survey/PlaystyleSelector.vue'
-import AttributeSlider from './survey/AttributeSlider.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -223,16 +222,25 @@ onMounted(() => {
 
             <div>
               <div class="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                <AttributeSlider
-                  :model-value="form.selfAssessment"
-                  label="Autovaloración inicial"
-                  :min="1"
-                  :max="5"
-                  :step="1"
-                  low-label="1 · Muy baja"
-                  high-label="5 · Muy alta"
-                  @update:model-value="form.selfAssessment = $event"
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-sm font-semibold text-slate-900">Autovaloración inicial</label>
+                  <span class="text-xs font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full">
+                    {{ form.selfAssessment }}/5
+                  </span>
+                </div>
+                <input
+                  v-model="form.selfAssessment"
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  class="w-full cursor-pointer accent-slate-900"
+                  :aria-label="`Autovaloración inicial: ${form.selfAssessment} de 5`"
                 />
+                <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>1 · Muy baja</span>
+                  <span>5 · Muy alta</span>
+                </div>
                 <div class="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-center">
                   <p class="text-lg font-bold text-slate-800">{{ form.selfAssessment }} · {{ selfAssessmentLabel }}</p>
                 </div>

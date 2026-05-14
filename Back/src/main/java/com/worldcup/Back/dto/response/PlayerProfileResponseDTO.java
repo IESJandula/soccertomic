@@ -22,13 +22,6 @@ public class PlayerProfileResponseDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class AttributesDTO {
-        private Integer shooting;
-        private Integer speed;
-        private Integer dribbling;
-        private Integer defense;
-        private Integer strength;
-        private Integer stamina;
-        private Integer aerial;
         private Boolean goalkeeper;
         private String posicionPreferida;
         private String playStyle;
@@ -36,7 +29,6 @@ public class PlayerProfileResponseDTO {
         private String playTendency;
         private String ageRange;
         private Integer selfAssessment;
-        private Float globalRating;
         private String piernaBuena;
         private java.util.List<String> disponibilidad;
     }

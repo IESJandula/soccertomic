@@ -34,28 +34,6 @@ public class PlayerProfileEntity {
     @JoinColumn(name = "usuario_id", nullable = false, unique = true)
     private UsuarioEntity usuario;
 
-    // ===== ATRIBUTOS NUMÉRICOS (0-5 escala) =====
-    @Column(nullable = false)
-    private Integer shooting = 3;
-
-    @Column(nullable = false)
-    private Integer speed = 3;
-
-    @Column(nullable = false)
-    private Integer dribbling = 3;
-
-    @Column(nullable = false)
-    private Integer defense = 3;
-
-    @Column(nullable = false)
-    private Integer strength = 3;
-
-    @Column(nullable = false)
-    private Integer stamina = 3;
-
-    @Column(nullable = false)
-    private Integer aerial = 3;
-
     // ===== POSICIÓN Y ESTILO =====
     @Column(nullable = false)
     private Boolean goalkeeper = false;
@@ -80,10 +58,6 @@ public class PlayerProfileEntity {
 
     @Column(nullable = true)
     private Integer selfAssessment; // 1 (muy baja) a 5 (muy alta)
-
-    // ===== RATING GLOBAL =====
-    @Column(nullable = false)
-    private Float globalRating = 3.0f;
 
     // ===== NUEVOS CAMPOS: PIERNA BUENA Y DISPONIBILIDAD =====
     @Column(nullable = true, length = 20)

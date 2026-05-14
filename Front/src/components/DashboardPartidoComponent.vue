@@ -35,10 +35,8 @@ const cargandoVotacion = ref(false)
 const guardandoVotacion = ref(false)
 const miVoto = ref(null)
 const resumenVotacion = ref(null)
-const procesandoRating = ref(false)
 const resultadoProcesoRating = ref(null)
 const mensajeProcesoRating = ref('')
-const ultimaEjecucionRating = ref(null)
 const companerosAsignados = ref([])
 const mensajeVotacion = ref('')
 const mostrarModalDiscusionResultado = ref(false)
@@ -423,6 +421,8 @@ const esParticipante = () => {
   return [...partido.value.equipoA, ...partido.value.equipoB].some(j => j.id === authStore.user.id)
 }
 
+const isReservationState = (estado) => estado === 'CONFIRMADO' || estado === 'RESERVADA'
+
 const esOwner = () => {
   return organizadores.value.some(o => o.usuario?.id === authStore.user?.id && o.rol === 'OWNER')
 }
@@ -792,7 +792,7 @@ const cerrarActaPartido = async () => {
 
   const accepted = await uiStore.askConfirm({
     title: 'Cerrar acta del partido',
-    message: 'Esta acción procesa el rating y bloquea toda interacción posterior. ¿Deseas continuar?',
+    message: 'Esta acción cierra el acta y bloquea toda interacción posterior. ¿Deseas continuar?',
     confirmLabel: 'CERRAR ACTA',
     cancelLabel: 'Cancelar',
     variant: 'danger',
@@ -883,52 +883,6 @@ const fechaProcesadoTexto = computed(() => {
   return fecha ? formatearFecha(fecha) : 'Pendiente'
 })
 
-const fechaUltimaEjecucionTexto = computed(() => {
-  const fecha = ultimaEjecucionRating.value?.fecha
-  if (!fecha) {
-    return resultadoProcesoRating.value?.procesadoEn
-      ? formatearFecha(resultadoProcesoRating.value.procesadoEn)
-      : 'Sin ejecuciones en esta sesión'
-  }
-  return formatearFecha(fecha)
-})
-
-const procesarRatingPartido = async () => {
-  if (!partido.value || !esOrganizador() || partido.value.estado !== 'FINALIZADO') return
-
-  procesandoRating.value = true
-  mensajeProcesoRating.value = ''
-
-  try {
-    const response = await partidoService.procesarRatingPartido(partido.value.id)
-    resultadoProcesoRating.value = response
-    mensajeProcesoRating.value = response?.mensaje || 'Proceso de rating ejecutado.'
-    ultimaEjecucionRating.value = {
-      fecha: new Date().toISOString(),
-      resultado: response?.resultadoResolucion || 'SIN_RESULTADO',
-      mensaje: mensajeProcesoRating.value,
-    }
-
-    if (response?.procesado) {
-      uiStore.showToast({ message: mensajeProcesoRating.value, type: 'success' })
-    } else {
-      uiStore.showToast({ message: mensajeProcesoRating.value, type: 'info' })
-    }
-
-    await recargarPartido()
-  } catch (err) {
-    mensajeProcesoRating.value = err?.message || 'No se pudo procesar el rating del partido'
-    ultimaEjecucionRating.value = {
-      fecha: new Date().toISOString(),
-      resultado: 'ERROR',
-      mensaje: mensajeProcesoRating.value,
-    }
-    uiStore.showToast({ message: mensajeProcesoRating.value, type: 'error' })
-  } finally {
-    procesandoRating.value = false
-  }
-}
-
 const handleGoBack = () => {
   router.back()
 }
@@ -991,10 +945,13 @@ const cerrarModalDiscusionResultado = () => {
       <!-- Participant View (For non-creators) -->
       <template v-else>
         <!-- Botón volver y header info for participants -->
-        <section v-if="partido.estado !== 'FINALIZADO'" class="card-surface p-3 md:p-4">
+        <section
+          v-if="partido.estado !== 'FINALIZADO'"
+          :class="['card-surface p-3 md:p-4', isReservationState(partido.estado) ? 'reserved-partido-aura' : '']"
+        >
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <StatusBadge :status="partido.estado" :show-icon="partido.estado === 'FINALIZADO' || partido.estado === 'EN_JUEGO' || partido.estado === 'EN_CURSO'" />
+              <StatusBadge :status="partido.estado" :show-icon="partido.estado === 'FINALIZADO' || partido.estado === 'EN_JUEGO' || partido.estado === 'EN_CURSO' || partido.estado === 'CONFIRMADO' || partido.estado === 'RESERVADA'" />
               <span :class="['inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold', partido.tipo === 'PUBLICO' ? 'bg-[color:rgba(151,240,125,0.16)] text-[color:var(--color-secondary)] border border-[color:rgba(151,240,125,0.34)]' : 'bg-[color:rgba(151,240,125,0.12)] text-[color:var(--color-secondary)] border border-[color:rgba(151,240,125,0.28)]']">
                 {{ partido.tipo === 'PUBLICO' ? 'Público' : 'Privado' }}
               </span>
@@ -1374,7 +1331,7 @@ const cerrarModalDiscusionResultado = () => {
             </div>
 
             <div v-if="partido?.estado === 'FINALIZADO' && !actaCerrada" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p class="text-xs text-slate-600">El partido ya finalizó. Cierra el acta para bloquear cambios y procesar el cierre oficial.</p>
+              <p class="text-xs text-slate-600">El partido ya finalizó. Cierra el acta para bloquear cambios y dejar el cierre oficial registrado.</p>
               <BaseButton size="sm" :loading="cerrandoActa" :disabled="cerrandoActa" @click="cerrarActaPartido">
                 Cerrar acta
               </BaseButton>
@@ -1658,7 +1615,7 @@ const cerrarModalDiscusionResultado = () => {
         <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div>
             <h3 class="text-lg font-bold text-slate-900">Discutir resultado</h3>
-            <p class="text-xs text-slate-600">Tu resultado se sumará a la media compartida.</p>
+            
           </div>
           <BaseButton size="sm" variant="ghost" @click="cerrarModalDiscusionResultado">Cerrar</BaseButton>
         </div>
@@ -1764,3 +1721,34 @@ const cerrarModalDiscusionResultado = () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes reservedPulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.44),
+      0 0 0 0 rgba(37, 99, 235, 0.22),
+      0 8px 20px rgba(37, 99, 235, 0.14);
+  }
+  60% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.34),
+      0 0 0 10px rgba(37, 99, 235, 0),
+      0 8px 20px rgba(37, 99, 235, 0.1);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.44),
+      0 0 0 0 rgba(37, 99, 235, 0),
+      0 8px 20px rgba(37, 99, 235, 0.14);
+  }
+}
+
+.reserved-partido-aura {
+  border: 1px solid rgba(37, 99, 235, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.45),
+    0 8px 20px rgba(37, 99, 235, 0.14);
+  animation: reservedPulse 2.2s ease-in-out infinite;
+}
+</style>

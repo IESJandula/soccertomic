@@ -703,6 +703,8 @@ public class PartidoService {
             throw new RuntimeException("Solo un organizador puede balancear equipos");
         }
 
+        validarPartidoAbiertoParaEdicion(partido, "balancear equipos");
+
         if (playerIds == null || playerIds.isEmpty()) {
             throw new IllegalArgumentException("Debes enviar al menos un jugador");
         }
@@ -731,7 +733,19 @@ public class PartidoService {
             .map(this::toCandidate)
             .collect(Collectors.toCollection(ArrayList::new));
 
-        PartitionResult bestPartition = calcularMejorParticion(candidatos, partido.getJugadoresPorEquipo());
+        boolean exigirPorteroPorEquipo = candidatos.stream()
+                .filter(BalanceCandidate::goalkeeperCandidate)
+                .count() >= 2;
+
+        PartitionResult bestPartition;
+        try {
+            bestPartition = calcularMejorParticion(candidatos, partido.getJugadoresPorEquipo(), exigirPorteroPorEquipo);
+        } catch (IllegalStateException ex) {
+            if (!exigirPorteroPorEquipo) {
+                throw ex;
+            }
+            bestPartition = calcularMejorParticion(candidatos, partido.getJugadoresPorEquipo(), false);
+        }
 
         TeamState equipoA = new TeamState(partido.getJugadoresPorEquipo());
         TeamState equipoB = new TeamState(partido.getJugadoresPorEquipo());
@@ -854,6 +868,14 @@ public class PartidoService {
             throw new IllegalArgumentException("El acta solo puede cerrarse cuando el partido está finalizado");
         }
 
+        if (Boolean.TRUE.equals(partido.getArchivado()) || Boolean.TRUE.equals(partido.getRatingProcesado())) {
+            throw new IllegalStateException("El acta ya fue cerrada o el rating ya fue procesado");
+        }
+
+        if (!partido.getJugadoresInscritos().isEmpty()) {
+            throw new IllegalStateException("No se puede cerrar el acta mientras queden jugadores inscritos sin asignar");
+        }
+
         PartidoRatingProcesoResponseDTO proceso = procesarRatingPartido(partidoId, solicitante);
 
         PartidoEntity actualizado = partidoRepository.findById(partidoId)
@@ -869,6 +891,24 @@ public class PartidoService {
         return proceso;
     }
 
+    private void validarPartidoAbiertoParaEdicion(PartidoEntity partido, String accion) {
+        if (partido == null) {
+            throw new IllegalArgumentException("El partido no existe");
+        }
+
+        if (partido.getEstado() != null && partido.getEstado().isFinalizado()) {
+            throw new IllegalStateException("No se puede " + accion + " en un partido finalizado");
+        }
+
+        if (Boolean.TRUE.equals(partido.getArchivado())) {
+            throw new IllegalStateException("No se puede " + accion + " con el acta cerrada");
+        }
+
+        if (Boolean.TRUE.equals(partido.getRatingProcesado())) {
+            throw new IllegalStateException("No se puede " + accion + " porque el rating ya fue procesado");
+        }
+    }
+
     @Transactional
     public PartidoEntity actualizarResultadoOficial(Long partidoId, UsuarioEntity solicitante, Integer golesEquipoA, Integer golesEquipoB) {
         PartidoEntity partido = partidoRepository.findById(partidoId)
@@ -882,6 +922,10 @@ public class PartidoService {
 
         if (Boolean.TRUE.equals(partido.getArchivado())) {
             throw new IllegalArgumentException("El acta está cerrada. Ya no se puede cambiar el resultado oficial");
+        }
+
+        if (Boolean.TRUE.equals(partido.getRatingProcesado())) {
+            throw new IllegalArgumentException("El resultado oficial ya no se puede cambiar porque el rating fue procesado");
         }
 
         if (golesEquipoA == null || golesEquipoB == null) {
@@ -1144,7 +1188,7 @@ public class PartidoService {
         );
         }
 
-    private PartitionResult calcularMejorParticion(List<BalanceCandidate> candidatos, int capacidadEquipo) {
+    private PartitionResult calcularMejorParticion(List<BalanceCandidate> candidatos, int capacidadEquipo, boolean exigirPorteroPorEquipo) {
         int total = candidatos.size();
         int floor = total / 2;
         int ceil = (total + 1) / 2;
@@ -1161,9 +1205,20 @@ public class PartidoService {
             throw new IllegalArgumentException("No es posible repartir jugadores respetando capacidad de equipos");
         }
 
+        // Estrategia escalonada de umbrales: intentar 4, 5, 6, 7, ...
+        int[] umbrales = {4, 5, 6, 7, 10, 15};
+        
+        for (int umbral : umbrales) {
+            PartitionResult mejorEnUmbral = calcularMejorParticionConUmbral(candidatos, objetivosA, exigirPorteroPorEquipo, umbral);
+            if (mejorEnUmbral != null && mejorEnUmbral.valid) {
+                return mejorEnUmbral;
+            }
+        }
+        
+        // Si nada cumple, retornar mejor sin restricción (diferencia mínima)
         PartitionResult mejorGlobal = null;
         for (Integer objetivoA : objetivosA) {
-            PartitionResult candidato = buscarMejorConObjetivo(candidatos, objetivoA);
+            PartitionResult candidato = buscarMejorConObjetivo(candidatos, objetivoA, exigirPorteroPorEquipo);
             if (mejorGlobal == null || candidato.compareTo(mejorGlobal) < 0) {
                 mejorGlobal = candidato;
             }
@@ -1176,18 +1231,40 @@ public class PartidoService {
         return mejorGlobal;
     }
 
-    private PartitionResult buscarMejorConObjetivo(List<BalanceCandidate> candidatos, int objetivoA) {
+    private PartitionResult calcularMejorParticionConUmbral(List<BalanceCandidate> candidatos, List<Integer> objetivosA, 
+                                                            boolean exigirPorteroPorEquipo, int umbral) {
+        PartitionResult mejorEnUmbral = null;
+        
+        for (Integer objetivoA : objetivosA) {
+            PartitionResult candidato = buscarMejorConObjetivoYUmbral(candidatos, objetivoA, exigirPorteroPorEquipo, umbral);
+            if (candidato != null && (mejorEnUmbral == null || candidato.compareTo(mejorEnUmbral) < 0)) {
+                mejorEnUmbral = candidato;
+            }
+        }
+        
+        return mejorEnUmbral;
+    }
+
+    private PartitionResult buscarMejorConObjetivoYUmbral(List<BalanceCandidate> candidatos, int objetivoA, 
+                                                          boolean exigirPorteroPorEquipo, int umbral) {
         boolean[] elegido = new boolean[candidatos.size()];
         SearchState state = new SearchState();
-        backtrackParticiones(candidatos, 0, objetivoA, elegido, state);
+        state.umbralValido = umbral;
+        backtrackParticiones(candidatos, 0, objetivoA, elegido, state, exigirPorteroPorEquipo);
         return state.best;
+    }
+
+    private PartitionResult buscarMejorConObjetivo(List<BalanceCandidate> candidatos, int objetivoA, 
+                                                    boolean exigirPorteroPorEquipo) {
+        return buscarMejorConObjetivoYUmbral(candidatos, objetivoA, exigirPorteroPorEquipo, Integer.MAX_VALUE);
     }
 
     private void backtrackParticiones(List<BalanceCandidate> candidatos,
                                       int index,
                                       int objetivoA,
                                       boolean[] elegido,
-                                      SearchState state) {
+                                      SearchState state,
+                                      boolean exigirPorteroPorEquipo) {
         int elegidosCount = 0;
         for (boolean value : elegido) {
             if (value) elegidosCount++;
@@ -1218,7 +1295,11 @@ public class PartidoService {
                 }
             }
 
-            PartitionResult candidato = evaluarParticion(equipoA, equipoB);
+            if (exigirPorteroPorEquipo && (!tienePortero(equipoA) || !tienePortero(equipoB))) {
+                return;
+            }
+
+            PartitionResult candidato = evaluarParticion(equipoA, equipoB, state.umbralValido);
             if (state.best == null || candidato.compareTo(state.best) < 0) {
                 state.best = candidato;
             }
@@ -1226,16 +1307,22 @@ public class PartidoService {
         }
 
         elegido[index] = true;
-        backtrackParticiones(candidatos, index + 1, objetivoA, elegido, state);
+        backtrackParticiones(candidatos, index + 1, objetivoA, elegido, state, exigirPorteroPorEquipo);
 
         elegido[index] = false;
-        backtrackParticiones(candidatos, index + 1, objetivoA, elegido, state);
+        backtrackParticiones(candidatos, index + 1, objetivoA, elegido, state, exigirPorteroPorEquipo);
     }
 
-    private PartitionResult evaluarParticion(List<BalanceCandidate> equipoA, List<BalanceCandidate> equipoB) {
+    private PartitionResult evaluarParticion(List<BalanceCandidate> equipoA, List<BalanceCandidate> equipoB, int umbralValido) {
         int nivelA = equipoA.stream().mapToInt(BalanceCandidate::level).sum();
         int nivelB = equipoB.stream().mapToInt(BalanceCandidate::level).sum();
         int diferenciaNivel = Math.abs(nivelA - nivelB);
+
+        // Validar umbral configurado
+        boolean valid = diferenciaNivel <= umbralValido;
+
+        int penalidadPorteros = calcularPenalidadPorteros(equipoA, equipoB);
+        int penalidadTendencias = calcularPenalidadTendencias(equipoA, equipoB);
 
         Set<String> posicionesA = equipoA.stream()
                 .flatMap(j -> j.positions().stream())
@@ -1248,7 +1335,7 @@ public class PartidoService {
         int faltantesB = (int) POSICIONES_CLAVE.stream().filter(pos -> !posicionesB.contains(pos)).count();
         int penalidadPosiciones = faltantesA + faltantesB;
 
-        return new PartitionResult(equipoA, equipoB, diferenciaNivel, penalidadPosiciones, nivelA, nivelB);
+        return new PartitionResult(equipoA, equipoB, penalidadPorteros, diferenciaNivel, penalidadTendencias, penalidadPosiciones, nivelA, nivelB, valid);
     }
 
     private BalanceCandidate toCandidate(UsuarioEntity usuario) {
@@ -1297,7 +1384,79 @@ public class PartidoService {
         }
         int level = aplicarAjusteFiabilidad(levelBase, usuario);
 
-        return new BalanceCandidate(usuario, level, primary, new HashSet<>(posiciones));
+        boolean goalkeeperCandidate = esCandidatoAPortero(usuario, profile, primary);
+        String tendencia = normalizarTendencia(profile == null ? null : profile.getPlayStyle(), profile == null ? null : profile.getPlayTendency());
+
+        return new BalanceCandidate(usuario, level, primary, new HashSet<>(posiciones), goalkeeperCandidate, tendencia);
+    }
+
+    private boolean esCandidatoAPortero(UsuarioEntity usuario, PlayerProfileEntity profile, String primaryPosition) {
+        if (usuario == null || profile == null) {
+            return false;
+        }
+
+        String playStyle = profile.getPlayStyle() == null ? "" : profile.getPlayStyle().trim().toUpperCase();
+        String playTendency = profile.getPlayTendency() == null ? "" : profile.getPlayTendency().trim().toUpperCase();
+
+        return Boolean.TRUE.equals(profile.getGoalkeeper())
+                || "ARQUERO".equals(primaryPosition)
+                || "PORTERO".equals(playTendency)
+                || "G".equals(playStyle);
+    }
+
+    private String normalizarTendencia(String playStyle, String playTendency) {
+        if (playStyle != null) {
+            String value = playStyle.trim().toUpperCase();
+            if ("O".equals(value) || "D".equals(value) || "A".equals(value) || "G".equals(value)) {
+                return value;
+            }
+        }
+
+        if (playTendency == null) {
+            return "A";
+        }
+
+        return switch (playTendency.trim().toUpperCase()) {
+            case "OFENSIVA" -> "O";
+            case "DEFENSIVA" -> "D";
+            case "PORTERO" -> "G";
+            default -> "A";
+        };
+    }
+
+    private boolean tienePortero(List<BalanceCandidate> equipo) {
+        return equipo.stream().anyMatch(BalanceCandidate::goalkeeperCandidate);
+    }
+
+    private int calcularPenalidadPorteros(List<BalanceCandidate> equipoA, List<BalanceCandidate> equipoB) {
+        int penalidad = 0;
+        if (!tienePortero(equipoA)) {
+            penalidad++;
+        }
+        if (!tienePortero(equipoB)) {
+            penalidad++;
+        }
+        return penalidad;
+    }
+
+    private int calcularPenalidadTendencias(List<BalanceCandidate> equipoA, List<BalanceCandidate> equipoB) {
+        Map<String, Long> tendenciaA = contarTendencias(equipoA);
+        Map<String, Long> tendenciaB = contarTendencias(equipoB);
+
+        long diferenciaOfensiva = Math.abs(tendenciaA.getOrDefault("O", 0L) - tendenciaB.getOrDefault("O", 0L));
+        long diferenciaDefensiva = Math.abs(tendenciaA.getOrDefault("D", 0L) - tendenciaB.getOrDefault("D", 0L));
+        long diferenciaAdaptable = Math.abs(tendenciaA.getOrDefault("A", 0L) - tendenciaB.getOrDefault("A", 0L));
+
+        return Math.toIntExact(diferenciaOfensiva + diferenciaDefensiva + diferenciaAdaptable);
+    }
+
+    private Map<String, Long> contarTendencias(List<BalanceCandidate> equipo) {
+        return equipo.stream()
+                .filter(candidate -> candidate.playStyle() != null && !"G".equals(candidate.playStyle()))
+                .collect(Collectors.groupingBy(
+                        BalanceCandidate::playStyle,
+                        Collectors.counting()
+                ));
     }
 
     private String normalizePosition(String raw) {
@@ -1435,31 +1594,54 @@ public class PartidoService {
         };
     }
 
-    private record BalanceCandidate(UsuarioEntity user, int level, String primaryPosition, Set<String> positions) {
+    private record BalanceCandidate(UsuarioEntity user, int level, String primaryPosition, Set<String> positions, boolean goalkeeperCandidate, String playStyle) {
     }
 
     private static class SearchState {
         private PartitionResult best;
+        private int umbralValido = Integer.MAX_VALUE;  // Sin límite por defecto
     }
 
     private record PartitionResult(
             List<BalanceCandidate> equipoA,
             List<BalanceCandidate> equipoB,
+            int penalidadPorteros,
             int diferenciaNivel,
+            int penalidadTendencias,
             int penalidadPosiciones,
             int nivelA,
-            int nivelB
+            int nivelB,
+            boolean valid
     ) {
         private int compareTo(PartitionResult other) {
-            if (diferenciaNivel != other.diferenciaNivel) {
-                return Integer.compare(diferenciaNivel, other.diferenciaNivel);
-            }
+            // Ambas válidas: comparación normal
+            if (this.valid && other.valid) {
+                if (penalidadPorteros != other.penalidadPorteros) {
+                    return Integer.compare(penalidadPorteros, other.penalidadPorteros);
+                }
 
-            if (penalidadPosiciones != other.penalidadPosiciones) {
-                return Integer.compare(penalidadPosiciones, other.penalidadPosiciones);
-            }
+                if (diferenciaNivel != other.diferenciaNivel) {
+                    return Integer.compare(diferenciaNivel, other.diferenciaNivel);
+                }
 
-            return Integer.compare(Math.abs(equipoA.size() - equipoB.size()), Math.abs(other.equipoA.size() - other.equipoB.size()));
+                if (penalidadTendencias != other.penalidadTendencias) {
+                    return Integer.compare(penalidadTendencias, other.penalidadTendencias);
+                }
+
+                if (penalidadPosiciones != other.penalidadPosiciones) {
+                    return Integer.compare(penalidadPosiciones, other.penalidadPosiciones);
+                }
+
+                return Integer.compare(Math.abs(equipoA.size() - equipoB.size()), Math.abs(other.equipoA.size() - other.equipoB.size()));
+            }
+            
+            // Si solo una es válida, la válida gana
+            if (this.valid != other.valid) {
+                return this.valid ? -1 : 1;
+            }
+            
+            // Ambas inválidas: priorizar menor diferencia (fallback suave)
+            return Integer.compare(diferenciaNivel, other.diferenciaNivel);
         }
     }
 

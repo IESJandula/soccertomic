@@ -22,35 +22,6 @@ public class PlayerProfileRequestDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class AttributesDTO {
-
-        @Min(value = 0, message = "Shooting debe estar entre 0 y 5")
-        @Max(value = 5, message = "Shooting debe estar entre 0 y 5")
-        private Integer shooting;
-
-        @Min(value = 0, message = "Speed debe estar entre 0 y 5")
-        @Max(value = 5, message = "Speed debe estar entre 0 y 5")
-        private Integer speed;
-
-        @Min(value = 0, message = "Dribbling debe estar entre 0 y 5")
-        @Max(value = 5, message = "Dribbling debe estar entre 0 y 5")
-        private Integer dribbling;
-
-        @Min(value = 0, message = "Defense debe estar entre 0 y 5")
-        @Max(value = 5, message = "Defense debe estar entre 0 y 5")
-        private Integer defense;
-
-        @Min(value = 0, message = "Strength debe estar entre 0 y 5")
-        @Max(value = 5, message = "Strength debe estar entre 0 y 5")
-        private Integer strength;
-
-        @Min(value = 0, message = "Stamina debe estar entre 0 y 5")
-        @Max(value = 5, message = "Stamina debe estar entre 0 y 5")
-        private Integer stamina;
-
-        @Min(value = 0, message = "Aerial debe estar entre 0 y 5")
-        @Max(value = 5, message = "Aerial debe estar entre 0 y 5")
-        private Integer aerial;
-
         private Boolean goalkeeper;
 
         private String posicionPreferida; // DELANTERO, MEDIOCAMPISTA, DEFENSA, PORTERO

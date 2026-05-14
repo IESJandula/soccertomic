@@ -412,13 +412,13 @@ const cardAuraClass = (partido) => {
   if (estado === 'CANCELADO') return 'cancelled-aura'
   if (isReservedStatus(partido)) return 'reserved-aura'
   if (isInGameStatus(estado)) return 'in-game-aura'
-  if (esOrganizador(partido) && estado !== 'FINALIZADO') return 'organizer-pulse'
+  if ((esOrganizador(partido) || estaInscritoEnPartido(partido)) && estado !== 'FINALIZADO') return 'organizer-pulse'
   return ''
 }
 
 const showStatusIconInListCard = (partido) => {
   const estado = statusLabel(partido)
-  return estado === 'FINALIZADO' || isInGameStatus(estado)
+  return estado === 'FINALIZADO' || isInGameStatus(estado) || isReservedStatus(partido)
 }
 
 const teamPalette = {
@@ -810,7 +810,7 @@ const eliminarPartido = async (partido) => {
                     <path d="M6 6l12 12M18 6L6 18" />
                   </svg>
                 </div>
-                <div v-if="isReservedStatus(partido)" class="paid-mark" aria-hidden="true">
+                <div v-if="isReservationState(partido.estado)" class="paid-mark" aria-hidden="true">
                   <svg viewBox="0 0 24 24" class="paid-mark-icon" xmlns="http://www.w3.org/2000/svg" focusable="false">
                     <path d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5V20l-6.5-3.8L5.5 20V6A1.5 1.5 0 0 1 7 4.5z" />
                   </svg>
@@ -945,7 +945,7 @@ const eliminarPartido = async (partido) => {
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </div>
-          <div v-if="isReservedStatus(partido)" class="paid-mark" aria-hidden="true">
+          <div v-if="isReservationState(partido.estado)" class="paid-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" class="paid-mark-icon" xmlns="http://www.w3.org/2000/svg" focusable="false">
               <path d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5V20l-6.5-3.8L5.5 20V6A1.5 1.5 0 0 1 7 4.5z" />
             </svg>
@@ -1155,7 +1155,7 @@ const eliminarPartido = async (partido) => {
                     <path d="M6 6l12 12M18 6L6 18" />
                   </svg>
                 </div>
-                <div v-if="isReservedStatus(partido)" class="paid-mark" aria-hidden="true">
+                <div v-if="isReservationState(partido.estado)" class="paid-mark" aria-hidden="true">
                   <svg viewBox="0 0 24 24" class="paid-mark-icon" xmlns="http://www.w3.org/2000/svg" focusable="false">
                     <path d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5V20l-6.5-3.8L5.5 20V6A1.5 1.5 0 0 1 7 4.5z" />
                   </svg>
@@ -1275,7 +1275,7 @@ const eliminarPartido = async (partido) => {
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </div>
-          <div v-if="isReservedStatus(partido)" class="paid-mark" aria-hidden="true">
+          <div v-if="isReservationState(partido.estado)" class="paid-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" class="paid-mark-icon" xmlns="http://www.w3.org/2000/svg" focusable="false">
               <path d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5V20l-6.5-3.8L5.5 20V6A1.5 1.5 0 0 1 7 4.5z" />
             </svg>
@@ -1581,8 +1581,8 @@ const eliminarPartido = async (partido) => {
 .cancelled-mark-icon {
   width: 100%;
   height: 100%;
-  opacity: 0.45;
-  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.35));
+  opacity: 0.26;
+  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.2));
 }
 
 .cancelled-mark-icon path {
@@ -1595,7 +1595,7 @@ const eliminarPartido = async (partido) => {
 .paid-mark {
   position: absolute;
   inset: 0;
-  padding: 6px;
+  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1607,13 +1607,13 @@ const eliminarPartido = async (partido) => {
   width: 100%;
   height: 100%;
   opacity: 0.32;
-  filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.28));
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.24));
 }
 
 .paid-mark-icon path {
   fill: none;
   stroke: rgba(59, 130, 246, 0.95);
-  stroke-width: 2.8;
+  stroke-width: 3.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1632,8 +1632,8 @@ const eliminarPartido = async (partido) => {
 .in-game-mark-icon {
   width: 100%;
   height: 100%;
-  opacity: 0.34;
-  filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.28));
+  opacity: 0.26;
+  filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.2));
 }
 
 .in-game-mark-icon path {
@@ -1658,8 +1658,8 @@ const eliminarPartido = async (partido) => {
 .finalized-mark-icon {
   width: 100%;
   height: 100%;
-  opacity: 0.34;
-  filter: drop-shadow(0 0 8px rgba(71, 85, 105, 0.24));
+  opacity: 0.26;
+  filter: drop-shadow(0 0 8px rgba(71, 85, 105, 0.18));
 }
 
 .finalized-mark-icon path {

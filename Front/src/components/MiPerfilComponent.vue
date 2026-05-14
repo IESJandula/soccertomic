@@ -5,6 +5,7 @@ import apiService from '../services/apiService'
 import { formatDateTimeEs } from '../utils/dateFormat'
 import playerProfileService from '../services/playerProfileService'
 import partidoService from '../services/partidoService'
+import TierIcon from './ui/TierIcon.vue'
 
 const authStore = useAuthStore()
 
@@ -138,6 +139,52 @@ const guardarPerfilFutbolista = async () => {
 
 const resumenEstadisticas = computed(() => {
   return `${partidosJugados.value} partidos jugados · ${historialPartidos.value.length} en historial`
+})
+
+const nivelVisibleBase = computed(() => {
+  const valor = Number(resumen.value?.nivelVisible)
+  return Number.isFinite(valor) ? valor : 0
+})
+
+const sigmaRating = computed(() => {
+  const valor = Number(resumen.value?.ratingSigma)
+  return Number.isFinite(valor) ? valor : 8.33
+})
+
+const nivelVisibleMaximo = 25
+
+const nivelVisibleNormalizado = computed(() => {
+  const porcentaje = nivelVisibleBase.value / nivelVisibleMaximo
+  return Math.max(0, Math.min(1, porcentaje))
+})
+
+const nivelEscalado = computed(() => {
+  const nivel = Math.round(nivelVisibleNormalizado.value * 9) + 1
+  return Math.max(1, Math.min(10, nivel))
+})
+
+const tierActual = computed(() => {
+  const nivel = nivelEscalado.value
+  if (nivel <= 3) return 'BRONCE'
+  if (nivel <= 6) return 'PLATA'
+  if (nivel <= 8) return 'ORO'
+  return 'DIAMANTE'
+})
+
+const rangosNivel = [
+  { tier: 'BRONCE', label: 'Bronce', min: 1, max: 3, gradient: 'from-amber-500 to-amber-600' },
+  { tier: 'PLATA', label: 'Plata', min: 4, max: 6, gradient: 'from-slate-300 to-slate-500' },
+  { tier: 'ORO', label: 'Oro', min: 7, max: 8, gradient: 'from-yellow-400 to-amber-500' },
+  { tier: 'DIAMANTE', label: 'Diamante', min: 9, max: 10, gradient: 'from-cyan-300 to-cyan-500' },
+]
+
+const fiabilidadScore = computed(() => {
+  const valor = Number(resumen.value?.fiabilidadScore)
+  return Number.isFinite(valor) ? valor : 0
+})
+
+const mostrarNivelVisible = computed(() => {
+  return sigmaRating.value <= 7
 })
 
 const tendenciaPreferidaLabel = computed(() => {
@@ -448,19 +495,64 @@ const nivelSocialExperiencia = computed(() => {
           </div>
 
           <div v-else class="space-y-3">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="bg-white border-2 border-blue-300 rounded-xl p-4 text-center shadow-sm">
-                <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Tendencia</p>
-                <p class="text-2xl md:text-3xl font-bold text-slate-900">
-                  {{ tendenciaPreferidaLabel }}
-                </p>
+            <div v-if="mostrarNivelVisible" class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-4 text-white shadow-sm">
+              <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                  <p class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-semibold">Nivel deportivo</p>
+                  <div class="flex items-center gap-2">
+                    <TierIcon :tier="tierActual" :size="22" />
+                    <p class="text-2xl md:text-3xl font-bold leading-tight">{{ tierActual }}</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <p class="text-[11px] uppercase tracking-[0.16em] text-slate-300 font-semibold">Nivel 1-10</p>
+                  <p class="text-sm md:text-base font-semibold text-slate-100">{{ nivelEscalado }} / 10</p>
+                </div>
               </div>
-              <div class="bg-white border-2 border-violet-300 rounded-xl p-4 text-center shadow-sm">
-                <p class="text-xs md:text-sm text-slate-700 font-semibold mb-1">Posición preferida</p>
-                <p class="text-2xl md:text-3xl font-bold text-slate-900">
-                  {{ posicionPreferidaLabel }}
-                </p>
+
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <div
+                    v-for="rango in rangosNivel"
+                    :key="rango.tier"
+                    class="rounded-xl border p-3 transition-all duration-300"
+                    :class="tierActual === rango.tier
+                      ? `border-white/20 bg-gradient-to-br ${rango.gradient} text-slate-950 shadow-lg shadow-black/20`
+                      : 'border-white/10 bg-white/10 text-slate-200 opacity-70'"
+                  >
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                      <TierIcon :tier="rango.tier" :size="18" />
+                      <span class="text-[10px] font-semibold uppercase tracking-[0.16em]">{{ rango.min }}-{{ rango.max }}</span>
+                    </div>
+                    <p class="text-sm font-bold leading-none">{{ rango.label }}</p>
+                    <p class="mt-1 text-[11px] leading-tight opacity-90">Nivel deportivo de {{ rango.min }} a {{ rango.max }}</p>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div class="flex items-center justify-between text-xs text-slate-300 mb-2">
+                    <span>Nivel visible actual</span>
+                    <span>{{ nivelVisibleBase.toFixed(2) }} / {{ nivelVisibleMaximo }}</span>
+                  </div>
+                  <div class="grid grid-cols-10 gap-1.5" role="progressbar" aria-valuemin="1" aria-valuemax="10" :aria-valuenow="nivelEscalado" :aria-label="`Nivel deportivo ${tierActual}, nivel ${nivelEscalado} de 10`">
+                    <div
+                      v-for="paso in 10"
+                      :key="paso"
+                      class="h-3 rounded-full transition-all duration-300"
+                      :class="paso <= nivelEscalado ? 'bg-gradient-to-r from-emerald-400 to-cyan-400' : 'bg-white/15'"
+                    ></div>
+                  </div>
+                </div>
               </div>
+
+              <p class="mt-3 text-sm text-slate-200">
+                {{ tierActual }} · datos suficientes para mostrar tu evolución visible.
+              </p>
+            </div>
+
+            <div v-else class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <p class="text-sm font-semibold text-amber-900">Aún no hay suficiente certeza para mostrar tu nivel.</p>
+              <p class="mt-1 text-sm text-amber-800">Debe bajar un poco más tu sigma para mostrar la barra deportiva.</p>
             </div>
 
             <div class="bg-slate-50 rounded-xl p-3 space-y-3 border border-slate-200">

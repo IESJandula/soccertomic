@@ -49,6 +49,7 @@ const showStatusIcon = () => props.showIcon && (
   props.paid ||
   props.status === 'CONFIRMADO' ||
   props.status === 'RESERVADA' ||
+  props.status === 'RESERVADO' ||
   props.status === 'EN_JUEGO' ||
   props.status === 'EN_CURSO' ||
   props.status === 'FINALIZADO'
