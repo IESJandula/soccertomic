@@ -52,6 +52,13 @@ const coloresDuplicados = computed(() => {
     && String(form.value.colorEquipoA || '').trim() === String(form.value.colorEquipoB || '').trim()
 })
 
+const fechaPasada = computed(() => {
+  if (!form.value.fecha || !form.value.hora) return false
+
+  const fechaHora = new Date(`${form.value.fecha}T${form.value.hora}:00`)
+  return fechaHora < new Date()
+})
+
 onMounted(async () => {
   try {
     misEquipos.value = await amistadService.obtenerMisEquipos()
@@ -75,7 +82,9 @@ const validateForm = () => {
   if (!form.value.fecha) errors.value.fecha = 'Selecciona una fecha.'
   if (!form.value.hora) errors.value.hora = 'Selecciona una hora.'
   if (!form.value.lugar?.trim()) errors.value.lugar = 'El lugar es obligatorio.'
-
+if (fechaPasada.value) {
+  errors.value.fecha = 'No puedes crear un partido en el pasado.'
+}
   const jugadores = Number(form.value.jugadoresPorEquipo)
   if (!Number.isInteger(jugadores) || jugadores < 1 || jugadores > 11) {
     errors.value.jugadoresPorEquipo = 'Ingresa un número entre 1 y 11.'
@@ -270,7 +279,7 @@ const handleCancel = () => {
 
         <div class="grid grid-cols-2 gap-3 pt-2 sm:max-w-sm sm:ml-auto">
           <BaseButton type="button" variant="secondary" block :disabled="loading" @click="handleCancel">Cancelar</BaseButton>
-          <BaseButton type="submit" variant="primary" block :loading="loading" :disabled="loading || coloresDuplicados">Crear partido</BaseButton>
+          <BaseButton type="submit" variant="primary" block :loading="loading" :disabled="loading || coloresDuplicados || fechaPasada">Crear partido</BaseButton>
         </div>
       </form>
     </section>

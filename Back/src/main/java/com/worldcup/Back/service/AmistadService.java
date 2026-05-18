@@ -22,21 +22,42 @@ public class AmistadService {
 
     @Transactional
     public AmistadEntity enviarSolicitud(UsuarioEntity usuarioA, UsuarioEntity usuarioB) {
+
         if (usuarioA.getId().equals(usuarioB.getId())) {
             throw new BusinessException("No puedes enviarte una solicitud de amistad a ti mismo");
         }
 
-        // Verificar que no exista ya una solicitud
-        Optional<AmistadEntity> existente = amistadRepository.findBetweenUsuarios(usuarioA, usuarioB);
+        Optional<AmistadEntity> existente =
+                amistadRepository.findBetweenUsuarios(usuarioA, usuarioB);
+
         if (existente.isPresent()) {
-            throw new BusinessException("Ya existe una solicitud de amistad entre estos usuarios");
+            AmistadEntity amistad = existente.get();
+
+            // Si ya están aceptados → no tocar
+            if (amistad.getEstado() == EstadoAmistad.ACEPTADA) {
+                throw new BusinessException("Ya sois amigos");
+            }
+
+            // Si estaba rechazada → reactivar solicitud
+            if (amistad.getEstado() == EstadoAmistad.RECHAZADA) {
+                amistad.setEstado(EstadoAmistad.SOLICITADA);
+                amistad.setCreadaEn(LocalDateTime.now());
+                return amistadRepository.save(amistad);
+            }
+
+            // Si ya hay solicitud pendiente
+            if (amistad.getEstado() == EstadoAmistad.SOLICITADA) {
+                throw new BusinessException("Ya existe una solicitud pendiente");
+            }
         }
 
+        // No existía relación previa
         AmistadEntity amistad = new AmistadEntity();
         amistad.setUsuarioA(usuarioA);
         amistad.setUsuarioB(usuarioB);
         amistad.setEstado(EstadoAmistad.SOLICITADA);
         amistad.setCreadaEn(LocalDateTime.now());
+
         return amistadRepository.save(amistad);
     }
 

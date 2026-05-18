@@ -435,7 +435,7 @@ const eliminarEquipoRapido = async (equipo) => {
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="solicitud in solicitudesEnviadas" :key="solicitud.id" class="border border-slate-200 rounded-xl p-3">
             <p class="font-semibold text-slate-800">{{ solicitud.usuarioB.nombre }}</p>
-            <p class="text-xs text-slate-500">Esperando respuesta de {{ solicitud.usuarioB.email }}</p>
+            <p class="text-xs text-slate-500">Esperando respuesta de {{ solicitud.usuarioB.nombre }}</p>
           </article>
         </div>
       </section>
