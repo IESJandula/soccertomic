@@ -253,11 +253,8 @@ const inscribirse = async () => {
   try {
     const detalle = await partidoService.inscribirseAPartido(partido.value.id)
     partido.value = detalle
-    feedbackInscripcion.value = 'Te has inscrito correctamente. Estás en la lista de pendientes de asignación.'
+    // Keep the toast only; remove the inline modal/section that duplicated this message.
     uiStore.showToast({ message: 'Te has inscrito correctamente.', type: 'join-success', duration: 5000 })
-    setTimeout(() => {
-      feedbackInscripcion.value = ''
-    }, 4500)
     await cargarAnalisisBalance(partido.value.id)
     await cargarPanelVotacion(partido.value.id)
   } catch (err) {

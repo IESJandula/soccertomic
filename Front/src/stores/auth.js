@@ -131,11 +131,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       setAuthToken(idToken)
-      // Only persist displayName during signup; regular login must not overwrite custom names.
-      const nombre = isRegistration
-        ? String(displayName || email.split('@')[0] || 'Usuario').trim()
-        : null
-      const response = await apiService.upsertPerfil(nombre, email)
+      // Send suggested `nombre` only during registration to avoid overwriting user-edited names on login.
+      const suggested = String(displayName || email.split('@')[0] || 'Usuario').trim()
+      const nombre = isRegistration ? suggested : null
+      const response = await apiService.upsertPerfil(nombre, email, displayName)
       const newUser = hydrateSessionUser(response, email)
       newUser.authProviderId = primaryProviderId || ''
       newUser.authProviderIds = Array.isArray(providerIds) ? providerIds.filter(Boolean) : []

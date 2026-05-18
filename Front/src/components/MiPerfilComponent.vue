@@ -107,7 +107,7 @@ const guardarInformacionBasica = async () => {
   ok.value = ''
 
   try {
-    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email)
+    await apiService.upsertPerfil(form.value.nombre.trim(), authStore.user?.email || resumen.value?.email, form.value.nombre.trim())
     await authStore.refreshUsuario()
     await cargarDatos()
     ok.value = 'Ficha de jugador actualizada correctamente'

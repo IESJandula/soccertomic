@@ -50,6 +50,19 @@ public class UserService {
         return firebaseUid + "@firebase.local";
     }
 
+    private String sanitizeName(String name) {
+        if (name == null) return null;
+        String s = name.trim();
+        if (s.isBlank()) return null;
+        // remove control characters
+        s = s.replaceAll("\\p{Cc}", "");
+        // limit length
+        if (s.length() > 100) {
+            s = s.substring(0, 100);
+        }
+        return s.isBlank() ? null : s;
+    }
+
     @Transactional
     public UsuarioEntity obtenerOCrearPorFirebaseUid(String firebaseUid, String emailToken) {
         return usuarioRepository.findByFirebaseUid(firebaseUid)
@@ -79,9 +92,27 @@ public class UserService {
         usuario.setFirebaseUid(firebaseUid);
         usuario.setEmail(resolvedEmail);
 
-        if (request != null && request.getNombre() != null && !request.getNombre().isBlank()) {
-            usuario.setNombre(request.getNombre());
-        } else if (usuario.getNombre() == null || usuario.getNombre().isBlank()) {
+        // Naming policy:
+        // - If client provides `nombre` (explicit edit), always use it.
+        // - Else, if existing stored name is the default (null/blank/or equal to resolvedEmail),
+        //   allow `displayName` from provider to populate it on first sign-in.
+        // - Otherwise keep existing customized name and do not overwrite on subsequent logins.
+        String existing = usuario.getNombre();
+        String existingSan = sanitizeName(existing);
+        boolean existingIsDefault = (existingSan == null) || existingSan.equals(resolvedEmail);
+
+        if (request != null) {
+            String nombreReq = sanitizeName(request.getNombre());
+            String displayReq = sanitizeName(request.getDisplayName());
+
+            if (nombreReq != null) {
+                usuario.setNombre(nombreReq);
+            } else if (existingIsDefault && displayReq != null) {
+                usuario.setNombre(displayReq);
+            }
+        }
+
+        if (usuario.getNombre() == null || usuario.getNombre().isBlank()) {
             usuario.setNombre(resolvedEmail);
         }
 

@@ -210,13 +210,16 @@ class APIService {
    * @param {string} nombre - User's display name
    * @param {string} email - User's email address (required for database)
    */
-  async upsertPerfil(nombre, email) {
+  async upsertPerfil(nombre, email, displayName) {
     const body = { nombre, email }
+    if (displayName !== undefined) {
+      body.displayName = displayName
+    }
 
     return this.request(ENDPOINTS.AUTH_ME, {
       method: 'PUT',
       useCache: false,
-      body: JSON.stringify(body),
+      body,
     })
   }
 

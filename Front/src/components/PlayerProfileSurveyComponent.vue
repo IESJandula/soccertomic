@@ -146,7 +146,7 @@ const guardarPerfil = async () => {
   try {
     const [result] = await Promise.all([
       profileStore.guardarMiPerfil(payload),
-      apiService.upsertPerfil(authStore.user?.displayName || authStore.user?.name || '', authStore.user?.email),
+      apiService.upsertPerfil(authStore.user?.displayName || authStore.user?.name || '', authStore.user?.email, authStore.user?.displayName || authStore.user?.name || ''),
     ])
 
     if (!result.success) {
