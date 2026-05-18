@@ -57,6 +57,15 @@
         </BaseButton>
 
         <BaseButton
+          v-if="puedeGestionarOrganizadores"
+          variant="primary"
+          size="sm"
+          @click="abrirModalEditar"
+        >
+          Editar fecha / lugar
+        </BaseButton>
+
+        <BaseButton
           v-if="totalJugadoresCount === 1"
           variant="danger"
           size="sm"
@@ -138,8 +147,39 @@
           </BaseButton>
         </div>
       </div>
-    </div>
+      </div>
 
+      <div v-if="mostrarModalEditar" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 class="text-xl font-bold text-slate-800 mb-3">Editar fecha y lugar</h3>
+
+          <label class="block text-sm font-medium text-slate-700 mb-1" for="fechaHora">Fecha y hora</label>
+          <input
+            id="fechaHora"
+            v-model="nuevaFechaHora"
+            type="datetime-local"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg mb-3"
+          />
+
+          <label class="block text-sm font-medium text-slate-700 mb-1" for="lugarEditar">Lugar</label>
+          <input
+            id="lugarEditar"
+            v-model="nuevoLugar"
+            type="text"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg"
+            placeholder="Ej: Polideportivo Municipal"
+          />
+
+          <div class="mt-5 flex gap-3">
+            <BaseButton variant="ghost" :full-width="true" :disabled="editando" @click="cerrarModalEditar">
+              Cancelar
+            </BaseButton>
+            <BaseButton variant="primary" :full-width="true" :loading="editando" :disabled="editando" @click="confirmarEditar">
+              Guardar cambios
+            </BaseButton>
+          </div>
+        </div>
+      </div>
     <div v-if="mostrarModalReservaPista" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
         <h3 class="text-xl font-bold text-slate-800 mb-3">Confirmar reserva de pista</h3>
@@ -549,6 +589,10 @@ const gestionandoOrganizador = ref('')
 const reservandoPista = ref(false)
 const precioPistaTotal = ref('')
 const estadoPagoReserva = ref({})
+const mostrarModalEditar = ref(false)
+const nuevaFechaHora = ref('')
+const nuevoLugar = ref('')
+const editando = ref(false)
 
 const teamPalette = {
   Blanco: { jersey: '#ffffff', onJersey: '#111827', border: 'rgba(255, 255, 255, 0.62)', aura: 'rgba(255, 255, 255, 0.24)' },
@@ -796,6 +840,49 @@ const puedeMarcarPistaReservada = computed(() => {
 
 const usuarioPagoConfirmado = (jugadorId) => {
   return Boolean(estadoPagoReserva.value?.[jugadorId])
+}
+
+const abrirModalEditar = () => {
+  mostrarModalEditar.value = true
+  // inicializar valores con los actuales
+  if (props.partida?.fecha) {
+    // Expecting formato like '2023-05-18T20:00:00' → strip seconds
+    nuevaFechaHora.value = String(props.partida.fecha).replace(/:00$/, '')
+  } else {
+    nuevaFechaHora.value = ''
+  }
+  nuevoLugar.value = props.partida?.lugar || ''
+}
+
+const cerrarModalEditar = () => {
+  mostrarModalEditar.value = false
+  nuevaFechaHora.value = ''
+  nuevoLugar.value = ''
+  editando.value = false
+}
+
+const confirmarEditar = async () => {
+  if (!nuevaFechaHora.value && !nuevoLugar.value) {
+    uiStore.showToast({ message: 'Indica una fecha o lugar válido.', type: 'warning' })
+    return
+  }
+  editando.value = true
+  try {
+    const payload = {}
+    if (nuevaFechaHora.value) {
+      payload.fecha = nuevaFechaHora.value.includes(':00') ? nuevaFechaHora.value : `${nuevaFechaHora.value}:00`
+    }
+    if (nuevoLugar.value) payload.lugar = nuevoLugar.value.trim()
+
+    const res = await partidoService.actualizarPartido(props.partida.id, payload)
+    uiStore.showToast({ message: 'Partido actualizado.', type: 'success' })
+    emit('actualizar')
+    cerrarModalEditar()
+  } catch (err) {
+    uiStore.showToast({ message: err?.message || 'Error al actualizar partido.', type: 'error' })
+  } finally {
+    editando.value = false
+  }
 }
 
 const cargarEstadoPagoReserva = async () => {

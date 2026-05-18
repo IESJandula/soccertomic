@@ -372,6 +372,9 @@ public class PartidoService {
             PartidoEntity p = partido.get();
             validarPermisoOrganizador(p, solicitante, "Solo una persona organizadora puede editar el partido");
             validarPartidoEditable(p);
+            LocalDateTime fechaAnterior = p.getFecha();
+            String lugarAnterior = p.getLugar();
+
             if (datosActualizados.getFecha() != null) p.setFecha(datosActualizados.getFecha());
             if (datosActualizados.getLugar() != null) p.setLugar(datosActualizados.getLugar());
             if (datosActualizados.getJugadoresPorEquipo() != null) p.setJugadoresPorEquipo(datosActualizados.getJugadoresPorEquipo());
@@ -382,9 +385,41 @@ public class PartidoService {
                 p.setModoEquipos("AUTO".equalsIgnoreCase(datosActualizados.getModoEquipos()) ? "AUTO" : "MANUAL");
             }
             p.setActualizadoEn(LocalDateTime.now());
-            return partidoRepository.save(p);
+            PartidoEntity guardado = partidoRepository.save(p);
+
+            // Si cambiaron fecha o lugar, notificar a participantes
+            boolean fechaCambiada = (fechaAnterior == null && guardado.getFecha() != null) || (fechaAnterior != null && !fechaAnterior.equals(guardado.getFecha()));
+            boolean lugarCambiado = (lugarAnterior == null && guardado.getLugar() != null) || (lugarAnterior != null && !lugarAnterior.equals(guardado.getLugar()));
+            if (fechaCambiada || lugarCambiado) {
+                notificarCambioFechaLugar(guardado, fechaAnterior, lugarAnterior, solicitante);
+            }
+
+            return guardado;
         }
         throw new ResourceNotFoundException("Partido", id);
+    }
+
+    private void notificarCambioFechaLugar(PartidoEntity partido, LocalDateTime fechaAnterior, String lugarAnterior, UsuarioEntity ejecutor) {
+        Set<UsuarioEntity> destinatarios = new HashSet<>();
+        if (partido.getJugadoresInscritos() != null) destinatarios.addAll(partido.getJugadoresInscritos());
+        if (partido.getEquipoA() != null) destinatarios.addAll(partido.getEquipoA());
+        if (partido.getEquipoB() != null) destinatarios.addAll(partido.getEquipoB());
+        if (partido.getOrganizadores() != null) {
+            partido.getOrganizadores().forEach(rel -> {
+                if (rel.getUsuario() != null) {
+                    destinatarios.add(rel.getUsuario());
+                }
+            });
+        }
+
+        String lugarNuevo = partido.getLugar() == null ? "Lugar no definido" : partido.getLugar();
+        String fechaNueva = partido.getFecha() == null ? "Fecha no definida" : partido.getFecha().format(FORMATO_FECHA_NOTIFICACION);
+        String fechaVieja = fechaAnterior == null ? "(sin fecha previa)" : fechaAnterior.format(FORMATO_FECHA_NOTIFICACION);
+        String lugarViejo = lugarAnterior == null ? "(sin lugar previo)" : lugarAnterior;
+
+        String mensaje = "El partido ha sido actualizado. Antes: " + lugarViejo + " el " + fechaVieja + ". Ahora: " + lugarNuevo + " el " + fechaNueva + ".";
+
+        destinatarios.stream().forEach(usuario -> invitacionService.crearNotificacionCambioFechaLugar(partido, usuario, mensaje));
     }
 
     @Transactional

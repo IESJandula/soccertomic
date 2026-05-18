@@ -152,6 +152,18 @@ public class InvitacionService {
         return invitacionRepository.save(notificacion);
     }
 
+    public InvitacionEntity crearNotificacionCambioFechaLugar(PartidoEntity partido, UsuarioEntity usuario, String mensaje) {
+        InvitacionEntity notificacion = new InvitacionEntity();
+        notificacion.setPartido(partido);
+        notificacion.setUsuario(usuario);
+        notificacion.setEstado(EstadoInvitacion.ACEPTADA);
+        notificacion.setMensaje(mensaje);
+        notificacion.setPagada(false);
+        notificacion.setCreadaEn(LocalDateTime.now());
+        notificacion.setRespondidaEn(LocalDateTime.now());
+        return invitacionRepository.save(notificacion);
+    }
+
     @Transactional
     public InvitacionEntity marcarReservaComoPagada(Long invitacionId, UsuarioEntity usuario) {
         InvitacionEntity invitacion = invitacionRepository.findById(invitacionId)
