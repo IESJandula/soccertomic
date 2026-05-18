@@ -1,4 +1,4 @@
-# SeJuega! — Documentación Estructural
+# FUTBOLIN — Documentación Estructural
 
 > Cortita y al pie, organiza tu partido en segundos
 
