@@ -152,7 +152,7 @@ public class InvitacionService {
         return invitacionRepository.save(notificacion);
     }
 
-    public InvitacionEntity crearNotificacionCambioFechaLugar(PartidoEntity partido, UsuarioEntity usuario, String mensaje) {
+    public InvitacionEntity crearNotificacionPartido(PartidoEntity partido, UsuarioEntity usuario, String mensaje) {
         InvitacionEntity notificacion = new InvitacionEntity();
         notificacion.setPartido(partido);
         notificacion.setUsuario(usuario);
@@ -162,6 +162,10 @@ public class InvitacionService {
         notificacion.setCreadaEn(LocalDateTime.now());
         notificacion.setRespondidaEn(LocalDateTime.now());
         return invitacionRepository.save(notificacion);
+    }
+
+    public InvitacionEntity crearNotificacionCambioFechaLugar(PartidoEntity partido, UsuarioEntity usuario, String mensaje) {
+        return crearNotificacionPartido(partido, usuario, mensaje);
     }
 
     @Transactional

@@ -350,9 +350,9 @@ const irAPartido = (partidoId) => {
         </div>
       </section>
 
-      <!-- Invitaciones a partidos pendientes -->
+      <!-- Notificaciones a partidos pendientes -->
       <section v-if="invitaciones.length > 0" class="card-surface p-4 md:p-5">
-        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="soccer" :size="18" />Invitaciones a partidos ({{ invitaciones.length }})</h3>
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="soccer" :size="18" />Notificaciones de partidos ({{ invitaciones.length }})</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitaciones" :key="inv.id" class="border border-amber-200 bg-amber-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
@@ -402,9 +402,9 @@ const irAPartido = (partidoId) => {
         </div>
       </section>
 
-      <!-- Invitaciones a equipos pendientes -->
+      <!-- Notificaciones a equipos pendientes -->
       <section v-if="invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length > 0" class="card-surface p-4 md:p-5">
-        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Invitaciones a equipos ({{ invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length }})</h3>
+        <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="users" :size="18" />Notificaciones de equipos ({{ invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length }})</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 mt-3">
           <article v-for="inv in invitacionesEquipo.filter(i => i.estado === 'PENDIENTE')" :key="`equipo-${inv.id}`" class="border border-indigo-200 bg-indigo-50 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2">
@@ -439,14 +439,14 @@ const irAPartido = (partidoId) => {
         </div>
       </section>
 
-      <!-- Invitaciones aceptadas -->
+      <!-- Notificaciones aceptadas -->
       <section v-if="invitacionesAceptadas.length > 0" class="card-surface p-4 md:p-5">
         <button
           type="button"
           class="w-full flex items-center justify-between gap-3"
           @click="mostrarInvitacionesAceptadas = !mostrarInvitacionesAceptadas"
         >
-          <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="check" :size="18" />Invitaciones aceptadas ({{ invitacionesAceptadas.length }})</h3>
+          <h3 class="text-lg font-semibold text-slate-800 inline-flex items-center gap-2"><AppIcon name="check" :size="18" />Notificaciones aceptadas ({{ invitacionesAceptadas.length }})</h3>
           <span class="text-sm font-semibold text-slate-600">{{ mostrarInvitacionesAceptadas ? 'Ocultar' : 'Mostrar' }}</span>
         </button>
 
@@ -482,7 +482,7 @@ const irAPartido = (partidoId) => {
       <!-- Estado vacío -->
       <section v-if="invitaciones.length === 0 && invitacionesEquipo.filter(i => i.estado === 'PENDIENTE').length === 0 && notificacionesInfo.length === 0 && invitacionesAceptadas.length === 0 && invitacionesCanceladas.length === 0 && invitacionesReservadas.length === 0 && invitacionesReservadasPagadas.length === 0 && solicitudesAmistad.length === 0" class="state-empty">
         <p class="text-slate-700 font-medium">No tienes notificaciones por ahora.</p>
-        <p class="text-caption mt-1">Las invitaciones y solicitudes de amistad aparecerán aquí.</p>
+        <p class="text-caption mt-1">Las notificaciones y solicitudes de amistad aparecerán aquí.</p>
       </section>
     </template>
   </div>

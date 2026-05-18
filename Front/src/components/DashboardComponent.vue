@@ -18,7 +18,7 @@ const navItems = [
   { name: 'Partidos', to: '/dashboard/partidos', label: 'Partidos', shortLabel: 'Partidos', icon: 'soccer' },
   { name: 'CrearPartido', to: '/dashboard/crear-partido', label: 'Nuevo partido', shortLabel: 'Crear', icon: 'plus' },
   { name: 'Amigos', to: '/dashboard/amigos', label: 'Mis amistades', shortLabel: 'Amistades', icon: 'users' },
-  { name: 'Invitaciones', to: '/dashboard/invitaciones', label: 'Invitaciones', shortLabel: 'Inbox', icon: 'bell' },
+  { name: 'Invitaciones', to: '/dashboard/invitaciones', label: 'Notificaciones', shortLabel: 'Notificaciones', icon: 'bell' },
   { name: 'MiPerfil', to: '/dashboard/mi-perfil', label: 'Mi perfil', shortLabel: 'Perfil', icon: 'user' },
 ]
 

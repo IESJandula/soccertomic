@@ -434,6 +434,24 @@ public class PartidoController {
         }
     }
 
+    @DeleteMapping("/{id}/jugadores/{usuarioId}")
+        public ResponseEntity<?> expulsarJugadorDePartido(
+            @PathVariable Long id,
+            @PathVariable Long usuarioId,
+            HttpServletRequest request
+    ) {
+        UsuarioEntity solicitante = userService.obtenerOCrearDesdeRequest(request);
+
+        try {
+            PartidoEntity actualizado = partidoService.expulsarJugadorDePartido(id, usuarioId, solicitante);
+            return ResponseEntity.ok(entityToDetalleDTO(actualizado, solicitante));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/jugadores/{usuarioId}/cambiar-equipo")
     public ResponseEntity<PartidoDetalleDTO> cambiarJugadorDeEquipo(
             @PathVariable Long id,

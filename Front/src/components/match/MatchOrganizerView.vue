@@ -309,6 +309,18 @@
               <span v-if="asignando === `${jugador.id}-B`">Procesando</span>
               <span v-else>Equipo {{ partida.colorEquipoB || 'B' }}</span>
             </button>
+
+            <button
+              v-if="puedeExpulsarParticipante && !esOrganizadorJugador(jugador.id)"
+              type="button"
+              @click="expulsarParticipante(jugador)"
+              :disabled="gestionandoExpulsion === `${jugador.id}`"
+              class="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Expulsar del partido"
+            >
+              <span v-if="gestionandoExpulsion === `${jugador.id}`">Procesando</span>
+              <span v-else>Expulsar</span>
+            </button>
           </div>
         </div>
       </div>
@@ -424,6 +436,18 @@
               </button>
 
               <button
+                v-if="puedeExpulsarParticipante && !esOrganizadorJugador(jugador.id)"
+                type="button"
+                @click="expulsarParticipante(jugador)"
+                :disabled="gestionandoExpulsion === `${jugador.id}`"
+                class="expel-button inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Expulsar del partido"
+              >
+                <span v-if="gestionandoExpulsion === `${jugador.id}`">Procesando</span>
+                <span v-else>Expulsar</span>
+              </button>
+
+              <button
                 type="button"
                 @click="moverASinEquipo(jugador.id)"
                 :disabled="asignando === `${jugador.id}-remove`"
@@ -533,6 +557,18 @@
               >
                 <span v-if="gestionandoOrganizador === `add-${jugador.id}`">Procesando</span>
                 <span v-else>Delegar</span>
+              </button>
+
+              <button
+                v-if="puedeExpulsarParticipante && !esOrganizadorJugador(jugador.id)"
+                type="button"
+                @click="expulsarParticipante(jugador)"
+                :disabled="gestionandoExpulsion === `${jugador.id}`"
+                class="expel-button inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Expulsar del partido"
+              >
+                <span v-if="gestionandoExpulsion === `${jugador.id}`">Procesando</span>
+                <span v-else>Expulsar</span>
               </button>
 
               <button
@@ -731,6 +767,7 @@ const totalJugadoresCount = computed(() => {
 })
 
 const currentUserId = computed(() => authStore.user?.id || null)
+const gestionandoExpulsion = ref('')
 
 const miRolOrganizador = computed(() => {
   const org = (props.partida?.organizadores || []).find(
@@ -832,6 +869,7 @@ const coOrganizadoresCount = computed(() => {
 })
 
 const puedeGestionarOrganizadores = computed(() => miRolOrganizador.value === 'OWNER')
+const puedeExpulsarParticipante = computed(() => Boolean(miRolOrganizador.value))
 
 const puedeMarcarPistaReservada = computed(() => {
   const estado = props.partida?.estado
@@ -985,6 +1023,29 @@ const moverASinEquipo = async (jugadorId) => {
     })
   } finally {
     asignando.value = ''
+  }
+}
+
+const expulsarParticipante = async (jugador) => {
+  if (!puedeExpulsarParticipante.value || !jugador?.id || esOrganizadorJugador(jugador.id)) {
+    return
+  }
+
+  gestionandoExpulsion.value = `${jugador.id}`
+  try {
+    await partidoService.expulsarJugador(props.partida.id, jugador.id)
+    emit('actualizar')
+    uiStore.showToast({
+      message: `${jugador.nombre} ha sido expulsado/a del partido`,
+      type: 'success',
+    })
+  } catch (error) {
+    uiStore.showToast({
+      message: error.message || 'Error al expulsar persona',
+      type: 'error',
+    })
+  } finally {
+    gestionandoExpulsion.value = ''
   }
 }
 
@@ -1180,3 +1241,17 @@ const marcarPistaReservada = async () => {
   }
 }
 </script>
+
+<style scoped>
+.expel-button {
+  background-color: #fef2f2 !important;
+  border-color: #b91c1c !important;
+  color: #b91c1c !important;
+}
+
+.expel-button:hover:not(:disabled) {
+  background-color: #fee2e2 !important;
+  border-color: #991b1b !important;
+  color: #991b1b !important;
+}
+</style>

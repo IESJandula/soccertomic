@@ -95,6 +95,14 @@ class PartidoService {
     })
   }
 
+  async expulsarJugador(partidoId, usuarioId) {
+    const url = `${ENDPOINTS.PARTIDOS}/${partidoId}/jugadores/${usuarioId}`
+    return apiService.request(url, {
+      method: 'DELETE',
+      useCache: false,
+    })
+  }
+
   async eliminarPartido(id) {
     return apiService.request(`${ENDPOINTS.PARTIDOS}/${id}`, {
       method: 'DELETE',

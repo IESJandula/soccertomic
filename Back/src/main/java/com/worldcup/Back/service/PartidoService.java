@@ -507,6 +507,43 @@ public class PartidoService {
     }
 
     @Transactional
+    public PartidoEntity expulsarJugadorDePartido(Long partidoId, Long jugadorId, UsuarioEntity solicitante) {
+        Optional<PartidoEntity> partido = partidoRepository.findByIdForUpdate(partidoId);
+        if (partido.isEmpty()) {
+            throw new ResourceNotFoundException("Partido", partidoId);
+        }
+
+        PartidoEntity p = partido.get();
+        validarPartidoEditable(p);
+        validarPermisoOrganizador(p, solicitante, "Solo una persona organizadora puede expulsar participantes");
+
+        UsuarioEntity jugador = usuarioRepository.findById(jugadorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", jugadorId));
+
+        if (esOrganizador(p, jugador)) {
+            throw new RuntimeException("No puedes expulsar a otra persona organizadora del partido");
+        }
+
+        if (!esParticipante(p, jugador)) {
+            throw new RuntimeException("El usuario no participa en este partido");
+        }
+
+        eliminarUsuarioPorId(p.getJugadoresInscritos(), jugadorId);
+        eliminarUsuarioPorId(p.getEquipoA(), jugadorId);
+        eliminarUsuarioPorId(p.getEquipoB(), jugadorId);
+        deduplicarParticipantes(p);
+
+        String expulsorNombre = (solicitante != null && solicitante.getNombre() != null && !solicitante.getNombre().isBlank())
+                ? solicitante.getNombre()
+                : "una persona organizadora";
+        String mensaje = "Has sido expulsado/a del partido por " + expulsorNombre + ".";
+        invitacionService.crearNotificacionPartido(p, jugador, mensaje);
+
+        p.setActualizadoEn(LocalDateTime.now());
+        return partidoRepository.save(p);
+    }
+
+    @Transactional
     public PartidoEntity asignarJugadorAEquipo(Long partidoId, Long jugadorId, String equipo, UsuarioEntity creador) {
         Optional<PartidoEntity> partido = partidoRepository.findById(partidoId);
         if (partido.isEmpty()) {
