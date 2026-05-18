@@ -22,6 +22,8 @@ export const useAuthStore = defineStore('auth', () => {
     email: email || '',
     name: resumen?.nombre || email || 'Usuario',
     rasgos: resumen?.rasgos || [],
+    authProviderId: '',
+    authProviderIds: [],
     conocimiento: {
       predicciones: 0,
       aciertos: 0,
@@ -98,6 +100,8 @@ export const useAuthStore = defineStore('auth', () => {
 
         const resumen = await apiService.getUsuarioResumen(null)
         const newUser = hydrateSessionUser(resumen, firebaseSession.email)
+        newUser.authProviderId = firebaseSession.primaryProviderId || ''
+        newUser.authProviderIds = Array.isArray(firebaseSession.providerIds) ? firebaseSession.providerIds.filter(Boolean) : []
         user.value = newUser
         sessionStorage.setItem('user', JSON.stringify(newUser))
         authStatus.value = 'authenticated'
@@ -120,7 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
     void initializeSession()
   }
 
-  const loginWithFirebaseToken = async ({ idToken, email, displayName }, isRegistration = false) => {
+  const loginWithFirebaseToken = async ({ idToken, email, displayName, primaryProviderId = '', providerIds = [] }, isRegistration = false) => {
     if (!idToken || !email) {
       return { success: false, message: 'Token y email son obligatorios para iniciar sesión' }
     }
@@ -133,6 +137,8 @@ export const useAuthStore = defineStore('auth', () => {
         : null
       const response = await apiService.upsertPerfil(nombre, email)
       const newUser = hydrateSessionUser(response, email)
+      newUser.authProviderId = primaryProviderId || ''
+      newUser.authProviderIds = Array.isArray(providerIds) ? providerIds.filter(Boolean) : []
       user.value = newUser
       sessionStorage.setItem('user', JSON.stringify(newUser))
       authStatus.value = 'authenticated'

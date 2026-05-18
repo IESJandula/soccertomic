@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
-import { loginWithEmailPassword, loginWithGooglePopup, registerWithEmailPassword } from '../services/firebaseClient'
+import { loginWithEmailPassword, loginWithGooglePopup, registerWithEmailPassword, sendPasswordResetLink } from '../services/firebaseClient'
 import BaseButton from './ui/BaseButton.vue'
 import AppIcon from './ui/AppIcon.vue'
 import futbolinLogo from '../assets/FutbolIn_Icono.png'
@@ -20,6 +20,11 @@ const authMode = ref('login')
 const email = ref('')
 const password = ref('')
 const loginError = ref('')
+const forgotPasswordOpen = ref(false)
+const forgotPasswordEmail = ref('')
+const forgotPasswordMessage = ref('')
+const forgotPasswordError = ref('')
+const forgotPasswordLoading = ref(false)
 
 const registerName = ref('')
 const registerEmail = ref('')
@@ -50,6 +55,20 @@ const resolvePostLoginRoute = (profileCompleted) => {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const validateForgotPasswordForm = () => {
+  const normalizedEmail = String(forgotPasswordEmail.value || '').trim()
+
+  if (!normalizedEmail) {
+    return 'El correo es obligatorio.'
+  }
+
+  if (!emailPattern.test(normalizedEmail)) {
+    return 'Introduce un correo válido.'
+  }
+
+  return ''
+}
 
 const validateEmailPasswordForm = () => {
   const normalizedEmail = String(email.value || '').trim()
@@ -156,6 +175,20 @@ const parseFirebaseAuthError = (error) => {
     }
   }
 
+  if (code === 'auth/requires-recent-login') {
+    return {
+      type: 'warning',
+      message: 'Vuelve a iniciar sesión para continuar.',
+    }
+  }
+
+  if (code === 'auth/user-token-expired') {
+    return {
+      type: 'warning',
+      message: 'Tu sesión ha caducado. Inicia sesión de nuevo.',
+    }
+  }
+
   if (code === 'auth/email-already-in-use') {
     return {
       type: 'error',
@@ -181,6 +214,24 @@ const parseFirebaseAuthError = (error) => {
     type: 'error',
     message: error?.message || 'No se pudo iniciar sesión con Firebase',
   }
+}
+
+const parseForgotPasswordError = (error) => {
+  const code = String(error?.code || '')
+
+  if (code === 'auth/invalid-email') {
+    return 'El correo no tiene un formato válido.'
+  }
+
+  if (code === 'auth/missing-android-pkg-name' || code === 'auth/unauthorized-continue-uri') {
+    return 'Revisa la configuración de enlaces de Firebase para restablecimiento de contraseña.'
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return 'Demasiados intentos seguidos. Espera un momento e inténtalo otra vez.'
+  }
+
+  return error?.message || 'No se pudo enviar el correo de restablecimiento'
 }
 
 const clearPopupReminder = () => {
@@ -257,6 +308,42 @@ const handleEmailPasswordAuth = async () => {
   } finally {
     loading.value = false
     activeAuthMethod.value = ''
+  }
+}
+
+const openForgotPassword = () => {
+  forgotPasswordEmail.value = String(email.value || '').trim()
+  forgotPasswordMessage.value = ''
+  forgotPasswordError.value = ''
+  forgotPasswordOpen.value = true
+}
+
+const closeForgotPassword = () => {
+  forgotPasswordOpen.value = false
+  forgotPasswordMessage.value = ''
+  forgotPasswordError.value = ''
+}
+
+const handleForgotPassword = async () => {
+  forgotPasswordError.value = ''
+  forgotPasswordMessage.value = ''
+
+  const validationError = validateForgotPasswordForm()
+  if (validationError) {
+    forgotPasswordError.value = validationError
+    return
+  }
+
+  forgotPasswordLoading.value = true
+  try {
+    await sendPasswordResetLink(forgotPasswordEmail.value.trim())
+    forgotPasswordMessage.value = 'Te hemos enviado un correo para restablecer la contraseña.'
+    uiStore.showToast({ message: forgotPasswordMessage.value, type: 'success' })
+  } catch (error) {
+    forgotPasswordError.value = parseForgotPasswordError(error)
+    uiStore.showToast({ message: forgotPasswordError.value, type: 'error' })
+  } finally {
+    forgotPasswordLoading.value = false
   }
 }
 
@@ -417,6 +504,47 @@ onMounted(() => {
             <BaseButton block variant="primary" :loading="loading && activeAuthMethod === 'password'" :disabled="loading" type="submit">
               Entrar con correo y contraseña
             </BaseButton>
+
+            <button
+              type="button"
+              class="w-full text-xs font-semibold text-[color:var(--color-secondary)] hover:underline text-center"
+              @click="forgotPasswordOpen ? closeForgotPassword() : openForgotPassword()"
+            >
+              ¿Has olvidado tu contraseña?
+            </button>
+
+            <div v-if="forgotPasswordOpen" class="rounded-xl border border-slate-700 bg-slate-950/60 p-4 space-y-3">
+              <p class="text-xs text-slate-300">
+                Introduce tu correo y te enviaremos un enlace para crear una nueva contraseña.
+              </p>
+              <label class="block">
+                <span class="block text-sm font-semibold text-slate-100 mb-1.5">Correo</span>
+                <input
+                  v-model.trim="forgotPasswordEmail"
+                  type="email"
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="tu@correo.com"
+                  class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-secondary)] focus:border-[color:var(--color-secondary)]"
+                />
+              </label>
+
+              <p v-if="forgotPasswordError" class="text-xs text-rose-300 font-medium">{{ forgotPasswordError }}</p>
+              <p v-else-if="forgotPasswordMessage" class="text-xs text-emerald-300 font-medium">{{ forgotPasswordMessage }}</p>
+
+              <div class="flex gap-2">
+                <BaseButton block variant="secondary" :loading="forgotPasswordLoading" :disabled="forgotPasswordLoading" type="button" @click="handleForgotPassword">
+                  Enviar enlace
+                </BaseButton>
+                <button
+                  type="button"
+                  class="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-800 transition"
+                  @click="closeForgotPassword"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
           </form>
 
           <form v-else class="space-y-3" @submit.prevent="handleRegisterEmailPassword">

@@ -5,14 +5,18 @@ import apiService from '../services/apiService'
 import { formatDateTimeEs } from '../utils/dateFormat'
 import playerProfileService from '../services/playerProfileService'
 import partidoService from '../services/partidoService'
+import { changeCurrentFirebasePassword } from '../services/firebaseClient'
 import TierIcon from './ui/TierIcon.vue'
 
 const authStore = useAuthStore()
 
 const loading = ref(true)
 const saving = ref(false)
+const passwordSaving = ref(false)
 const error = ref('')
 const ok = ref('')
+const passwordError = ref('')
+const passwordOk = ref('')
 
 const resumen = ref(null)
 const playerProfile = ref(null)
@@ -25,6 +29,12 @@ const expandedSections = ref({
   stats: false,
 })
 const editandoFutbolista = ref(false)
+const currentPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const showCurrentPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
 const resumenVotacion = ref({
   vecesDiferencial: 0,
   valoracionesPositivas: 0,
@@ -43,6 +53,8 @@ const preferenciasFutbolista = ref({
 const cargarDatos = async () => {
   loading.value = true
   error.value = ''
+  passwordError.value = ''
+  passwordOk.value = ''
   try {
     const [resumenData, profileData, historialData, votacionResumenData] = await Promise.all([
       apiService.getUsuarioResumen(),
@@ -74,6 +86,7 @@ const cargarDatos = async () => {
       posicionPreferida: profileData?.attributes?.posicionPreferida || (profileData?.attributes?.goalkeeper ? 'PORTERO' : 'MEDIOCAMPISTA'),
     }
     editandoFutbolista.value = false
+    resetPasswordForm()
   } catch (err) {
     error.value = err?.message || 'No se pudo cargar tu perfil'
   } finally {
@@ -134,6 +147,94 @@ const guardarPerfilFutbolista = async () => {
     error.value = err?.message || 'No se pudo guardar la ficha de jugador'
   } finally {
     saving.value = false
+  }
+}
+
+const puedeCambiarContrasena = computed(() => {
+  const providerIds = authStore.user?.authProviderIds || []
+  return authStore.user?.authProviderId === 'password' || providerIds.includes('password')
+})
+
+const resetPasswordForm = () => {
+  currentPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  showCurrentPassword.value = false
+  showNewPassword.value = false
+  showConfirmPassword.value = false
+}
+
+const validatePasswordChangeForm = () => {
+  const normalizedCurrent = String(currentPassword.value || '')
+  const normalizedNew = String(newPassword.value || '')
+  const normalizedConfirm = String(confirmPassword.value || '')
+
+  if (!normalizedCurrent) {
+    return 'Debes introducir tu contraseña actual.'
+  }
+
+  if (!normalizedNew) {
+    return 'Debes introducir la nueva contraseña.'
+  }
+
+  if (normalizedNew.length < 6) {
+    return 'La nueva contraseña debe tener al menos 6 caracteres.'
+  }
+
+  if (normalizedNew !== normalizedConfirm) {
+    return 'Las contraseñas no coinciden.'
+  }
+
+  return ''
+}
+
+const parsePasswordChangeError = (error) => {
+  const code = String(error?.code || '')
+
+  if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+    return 'La contraseña actual no es correcta.'
+  }
+
+  if (code === 'auth/requires-recent-login') {
+    return 'Vuelve a iniciar sesión para cambiar la contraseña.'
+  }
+
+  if (code === 'auth/weak-password') {
+    return 'La nueva contraseña es demasiado débil. Usa al menos 6 caracteres.'
+  }
+
+  if (code === 'auth/network-request-failed') {
+    return 'No se pudo conectar con Firebase. Revisa tu conexión.'
+  }
+
+  return error?.message || 'No se pudo cambiar la contraseña'
+}
+
+const cambiarContrasena = async () => {
+  passwordError.value = ''
+  passwordOk.value = ''
+
+  if (!puedeCambiarContrasena.value) {
+    passwordError.value = 'Tu cuenta usa Google, por eso no se puede cambiar la contraseña desde aquí.'
+    return
+  }
+
+  const validationError = validatePasswordChangeForm()
+  if (validationError) {
+    passwordError.value = validationError
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await changeCurrentFirebasePassword(currentPassword.value, newPassword.value)
+    passwordOk.value = 'Contraseña actualizada correctamente.'
+    ok.value = ''
+    resetPasswordForm()
+  } catch (err) {
+    passwordError.value = parsePasswordChangeError(err)
+  } finally {
+    passwordSaving.value = false
   }
 }
 
@@ -482,6 +583,54 @@ const nivelSocialExperiencia = computed(() => {
             <button @click="guardarInformacionBasica" :disabled="saving" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60">
               {{ saving ? 'Guardando...' : 'Guardar ficha' }}
             </button>
+          </div>
+
+          <div v-if="puedeCambiarContrasena" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-800">Cambiar contraseña</h3>
+              <p class="text-xs text-slate-500">Disponible sólo para cuentas con correo y contraseña.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label class="block">
+                <span class="block text-xs font-semibold text-gray-700 mb-1">Contraseña actual</span>
+                <div class="relative">
+                  <input v-model="currentPassword" :type="showCurrentPassword ? 'text' : 'password'" autocomplete="current-password" class="w-full px-3 py-2 pr-11 border border-gray-300 rounded-lg text-sm" />
+                  <button type="button" class="absolute inset-y-0 right-0 w-10 inline-flex items-center justify-center text-slate-500" :aria-label="showCurrentPassword ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'" @click="showCurrentPassword = !showCurrentPassword">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5c-7.633 0-11 7-11 7s3.367 7 11 7 11-7 11-7-3.367-7-11-7Zm0 12c-2.761 0-5-2.239-5-5s2.239-5 5-5 5 2.239 5 5-2.239 5-5 5Zm0-8.2A3.2 3.2 0 1 0 12 15.8 3.2 3.2 0 0 0 12 8.8Z"/></svg>
+                  </button>
+                </div>
+              </label>
+
+              <label class="block">
+                <span class="block text-xs font-semibold text-gray-700 mb-1">Nueva contraseña</span>
+                <div class="relative">
+                  <input v-model="newPassword" :type="showNewPassword ? 'text' : 'password'" autocomplete="new-password" class="w-full px-3 py-2 pr-11 border border-gray-300 rounded-lg text-sm" />
+                  <button type="button" class="absolute inset-y-0 right-0 w-10 inline-flex items-center justify-center text-slate-500" :aria-label="showNewPassword ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'" @click="showNewPassword = !showNewPassword">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5c-7.633 0-11 7-11 7s3.367 7 11 7 11-7 11-7-3.367-7-11-7Zm0 12c-2.761 0-5-2.239-5-5s2.239-5 5-5 5 2.239 5 5-2.239 5-5 5Zm0-8.2A3.2 3.2 0 1 0 12 15.8 3.2 3.2 0 0 0 12 8.8Z"/></svg>
+                  </button>
+                </div>
+              </label>
+
+              <label class="block">
+                <span class="block text-xs font-semibold text-gray-700 mb-1">Confirmar nueva contraseña</span>
+                <div class="relative">
+                  <input v-model="confirmPassword" :type="showConfirmPassword ? 'text' : 'password'" autocomplete="new-password" class="w-full px-3 py-2 pr-11 border border-gray-300 rounded-lg text-sm" />
+                  <button type="button" class="absolute inset-y-0 right-0 w-10 inline-flex items-center justify-center text-slate-500" :aria-label="showConfirmPassword ? 'Ocultar confirmación' : 'Mostrar confirmación'" @click="showConfirmPassword = !showConfirmPassword">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5c-7.633 0-11 7-11 7s3.367 7 11 7 11-7 11-7-3.367-7-11-7Zm0 12c-2.761 0-5-2.239-5-5s2.239-5 5-5 5 2.239 5 5-2.239 5-5 5Zm0-8.2A3.2 3.2 0 1 0 12 15.8 3.2 3.2 0 0 0 12 8.8Z"/></svg>
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <p v-if="passwordError" class="text-xs text-rose-600 font-medium">{{ passwordError }}</p>
+            <p v-else-if="passwordOk" class="text-xs text-emerald-600 font-medium">{{ passwordOk }}</p>
+
+            <div class="flex justify-end">
+              <button @click="cambiarContrasena" :disabled="passwordSaving" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-60">
+                {{ passwordSaving ? 'Actualizando...' : 'Cambiar contraseña' }}
+              </button>
+            </div>
           </div>
 
           <div v-if="!playerProfile && !editandoFutbolista" class="text-center py-8">

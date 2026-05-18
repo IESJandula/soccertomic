@@ -1,14 +1,18 @@
 import { initializeApp, getApp, getApps } from 'firebase/app'
 import {
   browserLocalPersistence,
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePassword,
   updateProfile,
 } from 'firebase/auth'
 
@@ -74,6 +78,21 @@ const waitForAuthState = (auth, timeoutMs) => {
   })
 }
 
+const getCurrentProviderIds = (firebaseUser) => {
+  if (!firebaseUser) {
+    return []
+  }
+
+  return (firebaseUser.providerData || [])
+    .map((provider) => provider?.providerId)
+    .filter(Boolean)
+}
+
+const getPrimaryProviderId = (firebaseUser) => {
+  const providerIds = getCurrentProviderIds(firebaseUser)
+  return providerIds[0] || firebaseUser?.providerId || ''
+}
+
 export const getActiveFirebaseSession = async ({ forceRefresh = true, timeoutMs = 4000 } = {}) => {
   const auth = await getFirebaseAuth()
   const firebaseUser = auth.currentUser || await waitForAuthState(auth, timeoutMs)
@@ -88,6 +107,8 @@ export const getActiveFirebaseSession = async ({ forceRefresh = true, timeoutMs 
     idToken,
     email: firebaseUser.email || '',
     displayName: firebaseUser.displayName || '',
+    providerIds: getCurrentProviderIds(firebaseUser),
+    primaryProviderId: getPrimaryProviderId(firebaseUser),
   }
 }
 
@@ -103,6 +124,8 @@ export const loginWithGooglePopup = async () => {
     idToken,
     email: credential.user.email || '',
     displayName: credential.user.displayName || '',
+    providerIds: getCurrentProviderIds(credential.user),
+    primaryProviderId: getPrimaryProviderId(credential.user),
   }
 }
 
@@ -115,6 +138,8 @@ export const loginWithEmailPassword = async (email, password) => {
     idToken,
     email: credential.user.email || email || '',
     displayName: credential.user.displayName || '',
+    providerIds: getCurrentProviderIds(credential.user),
+    primaryProviderId: getPrimaryProviderId(credential.user),
   }
 }
 
@@ -134,7 +159,32 @@ export const registerWithEmailPassword = async ({ email, password, displayName }
     idToken,
     email: credential.user.email || email || '',
     displayName: normalizedName || credential.user.displayName || '',
+    providerIds: getCurrentProviderIds(credential.user),
+    primaryProviderId: getPrimaryProviderId(credential.user),
   }
+}
+
+export const sendPasswordResetLink = async (email) => {
+  const normalizedEmail = String(email || '').trim()
+  if (!normalizedEmail) {
+    throw new Error('El correo es obligatorio')
+  }
+
+  const auth = await getFirebaseAuth()
+  await sendPasswordResetEmail(auth, normalizedEmail)
+}
+
+export const changeCurrentFirebasePassword = async (currentPassword, newPassword) => {
+  const auth = await getFirebaseAuth()
+  const firebaseUser = auth.currentUser
+
+  if (!firebaseUser?.email) {
+    throw new Error('No hay ninguna sesión activa')
+  }
+
+  const passwordCredential = EmailAuthProvider.credential(firebaseUser.email, String(currentPassword || ''))
+  await reauthenticateWithCredential(firebaseUser, passwordCredential)
+  await updatePassword(firebaseUser, String(newPassword || ''))
 }
 
 export const logoutFirebaseSession = async () => {
