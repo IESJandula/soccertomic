@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 
 @RestController
@@ -34,7 +36,7 @@ public class PartidoVotacionController {
     private UserService userService;
 
     @PostMapping("/me")
-    public ResponseEntity<PartidoVotacionResponseDTO> guardarMiVoto(
+    public ResponseEntity<?> guardarMiVoto(
             @PathVariable Long partidoId,
             HttpServletRequest request,
             @Valid @RequestBody PartidoVotacionRequestDTO dto
@@ -44,14 +46,17 @@ public class PartidoVotacionController {
         try {
             return ResponseEntity.ok(partidoVotacionService.guardarVoto(partidoId, usuario, dto));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(errorBody(e.getMessage()));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).build();
+            if (e.getMessage() == null || e.getMessage().isBlank()) {
+                throw e;
+            }
+            return ResponseEntity.status(403).body(errorBody(e.getMessage()));
         }
     }
 
     @GetMapping("/me")
-    public ResponseEntity<PartidoVotacionResponseDTO> obtenerMiVoto(
+    public ResponseEntity<?> obtenerMiVoto(
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
@@ -62,12 +67,15 @@ public class PartidoVotacionController {
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).build();
+            if (e.getMessage() == null || e.getMessage().isBlank()) {
+                throw e;
+            }
+            return ResponseEntity.status(403).body(errorBody(e.getMessage()));
         }
     }
 
-            @GetMapping("/panel-compartido")
-        public ResponseEntity<PartidoVotacionPanelCompartidoDTO> obtenerPanelCompartido(
+    @GetMapping("/panel-compartido")
+    public ResponseEntity<?> obtenerPanelCompartido(
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
@@ -76,12 +84,15 @@ public class PartidoVotacionController {
         try {
             return ResponseEntity.ok(partidoVotacionService.obtenerPanelCompartido(partidoId, usuario));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).build();
+            if (e.getMessage() == null || e.getMessage().isBlank()) {
+                throw e;
+            }
+            return ResponseEntity.status(403).body(errorBody(e.getMessage()));
         }
     }
 
     @GetMapping("/asignacion")
-    public ResponseEntity<List<PartidoCompaneroAsignadoDTO>> obtenerAsignacion(
+        public ResponseEntity<?> obtenerAsignacion(
             @PathVariable Long partidoId,
             HttpServletRequest request
     ) {
@@ -90,7 +101,16 @@ public class PartidoVotacionController {
         try {
             return ResponseEntity.ok(partidoVotacionService.obtenerAsignacion(partidoId, usuario));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).build();
+            if (e.getMessage() == null || e.getMessage().isBlank()) {
+                throw e;
+            }
+            return ResponseEntity.status(403).body(errorBody(e.getMessage()));
         }
+    }
+
+    private Map<String, Object> errorBody(String message) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("message", message != null ? message : "Unexpected error occurred");
+        return body;
     }
 }

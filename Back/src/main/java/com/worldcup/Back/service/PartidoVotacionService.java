@@ -95,21 +95,39 @@ public class PartidoVotacionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Partido", partidoId));
 
         autoFinalizarSiCorresponde(partido);
-        validarPermisosYEstado(partido, votante);
-
         if (Boolean.TRUE.equals(partido.getArchivado()) || Boolean.TRUE.equals(partido.getRatingProcesado())) {
             throw new RuntimeException("El acta está cerrada y ya no admite más votaciones");
         }
 
-        PartidoVotacionEntity entity = partidoVotacionRepository.findByPartidoAndVotante(partido, votante)
+        PartidoVotacionEntity entity;
+        // Buscar por IDs de forma explícita para evitar ambigüedades con proxies o entidades desconectadas
+        if (votante != null && votante.getId() != null) {
+            entity = partidoVotacionRepository.findExistingVote(partido.getId(), votante.getId())
                 .orElseGet(PartidoVotacionEntity::new);
+        } else {
+            entity = partidoVotacionRepository.findByPartidoAndVotante(partido, votante)
+                .orElseGet(PartidoVotacionEntity::new);
+        }
+
+        boolean esActualizacionPropia = entity.getId() != null
+                && votante != null
+                && votante.getId() != null
+                && entity.getVotante() != null
+                && votante.getId().equals(entity.getVotante().getId());
+
+        if (!esActualizacionPropia) {
+            validarPermisosYEstado(partido, votante);
+        }
 
         List<UsuarioEntity> participantes = obtenerParticipantesOrdenados(partido);
         List<UsuarioEntity> asignados = obtenerCompanerosAsignados(participantes, votante.getId());
         validarVotacion(partido, votante, dto, participantes, asignados);
 
-        entity.setPartido(partido);
-        entity.setVotante(votante);
+        // Actualizar (o crear) la votación con los nuevos valores
+        if (entity.getId() == null) {
+            entity.setPartido(partido);
+            entity.setVotante(votante);
+        }
         entity.setGolesEquipoAPropuesto(dto.getGolesEquipoAPropuesto());
         entity.setGolesEquipoBPropuesto(dto.getGolesEquipoBPropuesto());
         entity.setIntensidadPartido(normalizarIntensidad(dto.getIntensidadPartido()));
@@ -119,7 +137,7 @@ public class PartidoVotacionService {
         entity.setValoracionesCompaneros(mapearValoraciones(dto.getValoracionesCompaneros()));
         entity.setActualizadaEn(LocalDateTime.now());
 
-        PartidoVotacionEntity saved = partidoVotacionRepository.save(entity);
+        PartidoVotacionEntity saved = partidoVotacionRepository.saveAndFlush(entity);
         return toResponse(saved, asignados);
     }
 
@@ -263,10 +281,15 @@ public class PartidoVotacionService {
     }
 
     private void validarPermisosYEstado(PartidoEntity partido, UsuarioEntity usuario) {
-        boolean esCreador = partido.getOrganizadores().stream()
-            .anyMatch(org -> org.getUsuario().getId().equals(usuario.getId()) && org.getRol() == PartidoOrganizadorRol.OWNER);
-        boolean participa = partido.getEquipoA().stream().anyMatch(u -> u.getId().equals(usuario.getId()))
-                || partido.getEquipoB().stream().anyMatch(u -> u.getId().equals(usuario.getId()));
+        boolean esCreador = partido.getOrganizadores() != null && partido.getOrganizadores().stream()
+            .anyMatch(org -> org != null
+                    && org.getUsuario() != null
+                    && org.getUsuario().getId() != null
+                    && org.getUsuario().getId().equals(usuario.getId())
+                    && org.getRol() == PartidoOrganizadorRol.OWNER);
+        boolean participa = (partido.getJugadoresInscritos() != null && partido.getJugadoresInscritos().stream().anyMatch(u -> u.getId().equals(usuario.getId())))
+                || (partido.getEquipoA() != null && partido.getEquipoA().stream().anyMatch(u -> u.getId().equals(usuario.getId())))
+                || (partido.getEquipoB() != null && partido.getEquipoB().stream().anyMatch(u -> u.getId().equals(usuario.getId())));
 
         if (!(esCreador || participa)) {
             throw new RuntimeException("Solo participantes del partido pueden votar");
@@ -326,7 +349,7 @@ public class PartidoVotacionService {
 
         Set<Long> enviados = new HashSet<>();
         for (PartidoCompaneroValoracionRequestDTO valoracion : dto.getValoracionesCompaneros()) {
-            if (valoracion.getJugadorId().equals(votante.getId())) {
+            if (valoracion.getJugadorId() != null && valoracion.getJugadorId().equals(votante.getId())) {
                 throw new IllegalArgumentException("No puedes valorarte a ti mismo");
             }
             if (!participantesIds.contains(valoracion.getJugadorId())) {
@@ -354,6 +377,9 @@ public class PartidoVotacionService {
 
     private List<UsuarioEntity> obtenerParticipantesOrdenados(PartidoEntity partido) {
         List<UsuarioEntity> participantes = new ArrayList<>();
+        if (partido.getJugadoresInscritos() != null) {
+            participantes.addAll(partido.getJugadoresInscritos());
+        }
         if (partido.getEquipoA() != null) {
             participantes.addAll(partido.getEquipoA());
         }
@@ -423,7 +449,7 @@ public class PartidoVotacionService {
 
         return consolidadas.entrySet().stream()
                 .map(entry -> new PartidoCompaneroValoradoEmbeddable(entry.getKey(), entry.getValue()))
-                .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private PartidoVotacionResponseDTO toResponse(PartidoVotacionEntity entity, List<UsuarioEntity> asignados) {

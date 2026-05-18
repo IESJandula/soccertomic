@@ -820,14 +820,7 @@ const diferencialesResumen = computed(() => {
   const lista = Array.isArray(resumenVotacion.value?.jugadoresDiferenciales)
     ? resumenVotacion.value.jugadoresDiferenciales
     : []
-  return lista.slice(0, 3)
-})
-
-const diferencialesRestantes = computed(() => {
-  const total = Array.isArray(resumenVotacion.value?.jugadoresDiferenciales)
-    ? resumenVotacion.value.jugadoresDiferenciales.length
-    : 0
-  return Math.max(0, total - diferencialesResumen.value.length)
+  return lista
 })
 
 const participacionVotacionTexto = computed(() => {
@@ -1364,12 +1357,11 @@ const cerrarModalDiscusionResultado = () => {
                   :key="jugador.jugadorId"
                   :class="['inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs', esUsuarioActual(jugador.jugadorId) ? 'border-[color:var(--color-primary)] bg-[color:rgba(151,240,125,0.2)] text-[color:var(--color-secondary)] shadow-[0_0_0_1px_rgba(151,240,125,0.45)]' : 'border-amber-200 bg-amber-50 text-amber-800']"
                 >
-                  <span class="truncate max-w-[120px]">{{ jugador.jugadorNombre }}</span>
+                  <span class="max-w-[120px] truncate">{{ jugador.jugadorNombre }}</span>
                   <span class="font-bold">{{ jugador.votos }}</span>
                 </span>
               </div>
               <p v-else class="text-xs text-slate-500">Sin votos de diferenciales por ahora.</p>
-              <p v-if="diferencialesRestantes > 0" class="text-xs text-slate-500 mt-1">+{{ diferencialesRestantes }} más</p>
             </div>
           </div>
         </div>
