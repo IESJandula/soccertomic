@@ -252,7 +252,7 @@ const sigmaRating = computed(() => {
   return Number.isFinite(valor) ? valor : 8.33
 })
 
-const nivelVisibleMaximo = 25
+const nivelVisibleMaximo = 38
 
 const nivelVisibleNormalizado = computed(() => {
   const porcentaje = nivelVisibleBase.value / nivelVisibleMaximo
@@ -683,7 +683,7 @@ const nivelSocialExperiencia = computed(() => {
                     <span>Nivel visible actual</span>
                     <span>{{ nivelVisibleBase.toFixed(2) }} / {{ nivelVisibleMaximo }}</span>
                   </div>
-                  <div class="grid grid-cols-10 gap-1.5" role="progressbar" aria-valuemin="1" aria-valuemax="10" :aria-valuenow="nivelEscalado" :aria-label="`Nivel deportivo ${tierActual}, nivel ${nivelEscalado} de 10`">
+                  <div class="grid grid-cols-10 gap-1.5" role="progressbar" aria-valuemin="1" aria-valuemax="10" :aria-valuenow="nivelEscalado" :aria-label="`Nivel visible ${tierActual}, nivel ${nivelEscalado} de 10`">
                     <div
                       v-for="paso in 10"
                       :key="paso"
@@ -700,8 +700,8 @@ const nivelSocialExperiencia = computed(() => {
             </div>
 
             <div v-else class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <p class="text-sm font-semibold text-amber-900">Aún no hay suficiente certeza para mostrar tu nivel.</p>
-              <p class="mt-1 text-sm text-amber-800">Debe bajar un poco más tu sigma para mostrar la barra deportiva.</p>
+              <p class="text-sm font-semibold text-amber-900">Acabas de saltar a los terrenos de juego.</p>
+              <p class="mt-1 text-sm text-amber-800">Juega más partidos para conocer tu nivel.</p>
             </div>
 
             <div class="bg-slate-50 rounded-xl p-3 space-y-3 border border-slate-200">
