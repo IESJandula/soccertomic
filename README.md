@@ -1,4 +1,4 @@
-# SeJuega! — Documentación Estructural
+# FUTBOLIN — Documentación Estructural
 
 > Cortita y al pie, organiza tu partido en segundos
 
@@ -44,31 +44,6 @@ Flujo general:
 ### Base de datos
 - Core (`Back`): MySQL/MariaDB/PostgreSQL driver disponible (usa URL por variable)
 
-## Puertos y URLs
-
-- Front (dev): `http://localhost:5173`
-- Back (core): `http://localhost:8080`
-
-## Variables de entorno necesarias
-
-### Back (Core)
-- `CORE_DB_URL` (requerida)
-- `CORE_DB_USER` (requerida)
-- `CORE_DB_PASSWORD` (requerida)
-- `CORS_ALLOWED_ORIGINS` (requerida)
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CREDENTIALS_PATH`
-
-Producción (perfil `prod`):
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CREDENTIALS_PATH`
-
-### Front
-- `VITE_CORE_API_URL` (ej. `http://localhost:8080`)
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_APP_ID`
 
 ## Cómo levantar el backend Core
 
@@ -91,21 +66,5 @@ Desde `Front/`:
 ```bash
 pnpm install
 pnpm dev
-```
-
-## Tests rápidos
-
-Backend:
-
-```powershell
-cd Back
-.\mvnw.cmd test
-```
-
-Frontend:
-
-```powershell
-cd Front
-pnpm.cmd test
 ```
 
